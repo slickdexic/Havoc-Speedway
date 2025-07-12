@@ -7,11 +7,22 @@ export interface Card {
   suit: Suit;
   rank: Rank;
   id: string; // unique identifier for tracking
+  isFlipped?: boolean; // for dealer selection cards
+  position?: { x: number; y: number }; // for animations
 }
 
 export interface CardDeck {
   cards: Card[];
   isDoubleDeck: boolean;
+}
+
+// Dealer selection state
+export interface DealerSelectionState {
+  dealerCards: Card[]; // 18 face-down cards in 3x6 grid
+  selectedCards: Map<string, Card>; // playerId -> selected card
+  currentSelectingPlayerId: string;
+  dealerId?: string;
+  isComplete: boolean;
 }
 
 // Special card effects
@@ -41,4 +52,12 @@ export interface StormGameState {
   toxicDrawAmount: number;
   calledSuit?: Suit; // when Queen is played
   finishingOrder: string[]; // playerIds in finishing order (1st, 2nd, 3rd, 4th)
+  isComplete: boolean;
 }
+
+// Card game actions
+export type CardAction = 
+  | { type: 'SELECT_DEALER_CARD'; playerId: string; cardId: string }
+  | { type: 'PLAY_CARD'; playerId: string; cardId: string; calledSuit?: Suit }
+  | { type: 'DRAW_CARDS'; playerId: string; count: number }
+  | { type: 'CALL_SUIT'; playerId: string; suit: Suit };

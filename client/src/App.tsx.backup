@@ -1,0 +1,406 @@
+import { useState, useEffect } from 'react'
+import './App.css'
+import { Lobby } from './components/Lobby'
+import { GameRoom } from './components/GameRoom'
+import type { GameSettings } from '@havoc-speedway/shared';
+
+interface Player {
+  id: string;
+  name: string;
+  color: string;
+  isDealer?: boolean;
+  isHost?: boolean;
+  isConnected?: boolean;
+}
+
+interface GameState {
+  stage: string;
+  roomId: string;
+  roomName: string;
+  players: Player[];
+  settings?: GameSettings;
+  currentPlayerIndex?: number;
+  dealerIndex?: number;
+  dealerCards?: any[];
+  message?: string;
+  roundNumber?: number;
+}
+
+interface Room {
+  id: string;
+  name: string;
+  playerCount: number;
+  maxPlayers: number;
+  stage: string;
+  isPublic: boolean;
+  code: string;
+  settings: GameSettings;
+}
+
+function App() {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: string;
+    sender: string;
+    content: string;
+    isPrivate: boolean;
+    timestamp: number;
+  }>>([]);
+
+  useEffect(() => {
+    // Load saved player name
+    const saved = localStorage.getItem('havoc-speedway-current-player');
+    if (saved) {
+      setPlayerName(saved);
+    }
+
+    connectToServer();
+    
+    return () => {
+      if (socket) {
+        socket.close();
+      }
+    };
+  }, []);
+
+  const connectToServer = () => {
+    // Prevent multiple concurrent connection attempts
+    if (socket && socket.readyState === WebSocket.CONNECTING) {
+      return;
+    }
+    
+    try {
+      const ws = new WebSocket('ws://localhost:3003');
+      
+      ws.onopen = () => {
+        console.log('Connected to server');
+        setIsConnected(true);
+        setConnectionError(null);
+        setSocket(ws);
+        // Request room list immediately
+        ws.send(JSON.stringify({ type: 'list_rooms' }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('Received message:', message);
+          
+          switch (message.type) {
+            case 'room_created':
+              console.log('Room created:', message.roomId);
+              // Refresh room list after creating
+              ws.send(JSON.stringify({ type: 'list_rooms' }));
+              break;
+              
+            case 'joined_room':
+              console.log('Joined room:', message.roomId);
+              setChatMessages([]); // Clear previous chat
+              setGameState(message.gameState);
+              break;
+              
+            case 'game_state':
+            case 'game_state_update':
+              console.log('Game state updated:', message.gameState);
+              setGameState(message.gameState);
+              break;
+
+            case 'rooms_list':
+              console.log('Rooms updated:', message.rooms);
+              setRooms(message.rooms || []);
+              break;
+              
+            case 'room-updated':
+              console.log('Room updated:', message.gameState);
+              setGameState(message.gameState);
+              break;
+              
+            case 'chat-message':
+              console.log('Chat message:', message);
+              setChatMessages(prev => [...prev, {
+                id: message.id,
+                sender: message.sender,
+                content: message.content,
+                isPrivate: message.isPrivate,
+                timestamp: message.timestamp
+              }]);
+              break;
+              
+            case 'kicked':
+              console.log('Kicked from room:', message.message);
+              setConnectionError(message.message);
+              setGameState(null);
+              setChatMessages([]);
+              // Refresh room list
+              ws.send(JSON.stringify({ type: 'list_rooms' }));
+              break;
+              
+            case 'error':
+              console.error('Server error:', message.error);
+              setConnectionError(message.error);
+              break;
+              
+            default:
+              console.log('Unknown message type:', message.type);
+          }
+        } catch (error) {
+          console.error('Error parsing message:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log('Disconnected from server');
+        setIsConnected(false);
+        setSocket(null);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionError('Connection failed');
+        setIsConnected(false);
+      };
+      
+    } catch (error) {
+      console.error('Failed to connect:', error);
+      setConnectionError('Failed to connect to server');
+      setTimeout(connectToServer, 3000);
+    }
+  };
+
+  const sendMessage = (message: any) => {
+    console.log('Sending message:', message);
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message));
+      console.log('Message sent successfully');
+    } else {
+      console.error('Socket not connected, readyState:', socket?.readyState);
+    }
+  };
+
+  const handleJoinRoom = (name: string, roomId: string) => {
+    setPlayerName(name);
+    localStorage.setItem('havoc-speedway-current-player', name);
+    sendMessage({
+      type: 'join_room',
+      roomId: roomId,
+      playerName: name
+    });
+  };
+
+  const handleJoinWithCode = (name: string, roomCode: string) => {
+    console.log('handleJoinWithCode called with:', { name, roomCode });
+    setPlayerName(name);
+    localStorage.setItem('havoc-speedway-current-player', name);
+    sendMessage({
+      type: 'join_room_code',
+      roomCode: roomCode,
+      playerName: name
+    });
+  };
+
+  const handleCreateRoom = (name: string, roomName: string, isPublic: boolean, settings: GameSettings) => {
+    console.log('handleCreateRoom called with:', { name, roomName, isPublic, settings });
+    setPlayerName(name);
+    localStorage.setItem('havoc-speedway-current-player', name);
+    sendMessage({
+      type: 'create_room',
+      roomName: roomName,
+      playerName: name,
+      isPublic: isPublic,
+      settings: settings
+    });
+  };
+
+  const handleRefreshRooms = () => {
+    sendMessage({ type: 'list_rooms' });
+  };
+
+  const handleStartGame = () => {
+    sendMessage({ type: 'start_game' });
+  };
+
+  const handleLeaveRoom = () => {
+    sendMessage({ type: 'leave_room' });
+    setGameState(null);
+    setChatMessages([]);
+    // Refresh room list
+    sendMessage({ type: 'list_rooms' });
+  };
+
+  const handleKickPlayer = (playerId: string) => {
+    console.log('Kick player:', playerId);
+    sendMessage({ 
+      type: 'kick_player', 
+      playerId 
+    });
+  };
+
+  const handleChangeSettings = (settings: GameSettings) => {
+    console.log('Change settings:', settings);
+    sendMessage({ 
+      type: 'change_settings', 
+      settings 
+    });
+  };
+
+  const handleSendMessage = (message: string, isPrivate: boolean, targetPlayerId?: string) => {
+    console.log('Send message:', { message, isPrivate, targetPlayerId });
+    sendMessage({ 
+      type: 'send_message', 
+      content: message,
+      isPrivate,
+      targetPlayerId
+    });
+  };
+
+  const handleChangeColor = (color: string) => {
+    console.log('Change color:', color);
+    sendMessage({ 
+      type: 'change_color', 
+      color 
+    });
+  };
+
+  const handlePlayerAction = (action: any) => {
+    console.log('Player action:', action);
+    sendMessage({
+      type: 'player_action',
+      action
+    });
+  };
+
+  // Helper function to get display name for stages
+  const getStageDisplayName = (stage: string): string => {
+    switch (stage) {
+      case 'waiting': return 'Waiting for Players';
+      case 'dealer-selection': return 'Dealer Selection';
+      case 'storm': return 'Storm Phase';
+      case 'lane-selection': return 'Lane Selection';
+      case 'coin': return 'Coin Placement';
+      case 'racing': return 'Racing';
+      default: return stage;
+    }
+  };
+
+  // Determine if current player is host
+  const currentPlayer = gameState?.players.find(p => p.name === playerName);
+  const isHost = currentPlayer?.isHost || false;
+  const currentPlayerId = currentPlayer?.id || '';
+
+  // Show lobby if not in a game
+  if (!gameState) {
+    return (
+      <div className="app">
+        <Lobby
+          playerName={playerName}
+          isConnected={isConnected}
+          rooms={rooms}
+          onJoin={handleJoinRoom}
+          onJoinWithCode={handleJoinWithCode}
+          onCreate={handleCreateRoom}
+          onRefreshRooms={handleRefreshRooms}
+        />
+        {connectionError && (
+          <div className="error-message">
+            {connectionError}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Determine view mode based on game stage
+  const isPreGame = gameState.stage === 'waiting';
+  const isInGameStage = ['dealer-selection', 'storm', 'lane-selection', 'coin', 'racing'].includes(gameState.stage);
+
+  if (isPreGame) {
+    // Professional Pre-Game Lobby Interface
+    return (
+      <div className="app">
+        <div className="connection-status">
+          <div className="status-indicator status-connected"></div>
+          <span>Connected to Server</span>
+        </div>
+        <div className="room-header">
+          <h1 className="room-title">🏁 {gameState.roomName}</h1>
+          <div className="room-status">
+            <span className="status-badge waiting">Waiting for Game Start</span>
+          </div>
+        </div>
+        <GameRoom
+          gameState={gameState}
+          currentPlayerId={currentPlayerId}
+          isHost={isHost}
+          onLeaveRoom={handleLeaveRoom}
+          onStartGame={handleStartGame}
+          onKickPlayer={handleKickPlayer}
+          onChangeSettings={handleChangeSettings}
+          onSendMessage={handleSendMessage}
+          onChangeColor={handleChangeColor}
+          onPlayerAction={handlePlayerAction}
+          chatMessages={chatMessages}
+        />
+      </div>
+    );
+  } else if (isInGameStage) {
+    // Professional In-Game Interface
+    return (
+      <div className="app game-mode">
+        <div className="game-header">
+          <div className="game-title-section">
+            <h1 className="game-title">🏁 Havoc Speedway</h1>
+            <div className="game-info">
+              <span className="room-name">{gameState.roomName}</span>
+              <div className="stage-indicator">
+                <span className="stage-name">{getStageDisplayName(gameState.stage)}</span>
+                {(gameState.roundNumber || 0) > 0 && (
+                  <span className="round-indicator">Round {gameState.roundNumber}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="game-controls">
+            <button 
+              onClick={handleLeaveRoom}
+              className="btn btn-danger btn-sm hover-lift"
+              title="Leave Game"
+            >
+              🚪 Leave Game
+            </button>
+          </div>
+        </div>
+        <div className="game-content">
+          <GameRoom
+            gameState={gameState}
+            currentPlayerId={currentPlayerId}
+            isHost={isHost}
+            onLeaveRoom={handleLeaveRoom}
+            onStartGame={handleStartGame}
+            onKickPlayer={handleKickPlayer}
+            onChangeSettings={handleChangeSettings}
+            onSendMessage={handleSendMessage}
+            onChangeColor={handleChangeColor}
+            onPlayerAction={handlePlayerAction}
+            chatMessages={chatMessages}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback - should not reach here
+  return (
+    <div className="app">
+      <div className="error-message">
+        Unknown game state: {gameState?.stage}
+      </div>
+    </div>
+  );
+}
+
+export default App;

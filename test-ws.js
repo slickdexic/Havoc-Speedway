@@ -3,7 +3,7 @@ const WebSocket = require('ws');
 
 console.log('🧪 Testing WebSocket connection to server...');
 
-const ws = new WebSocket('ws://localhost:3001');
+const ws = new WebSocket('ws://localhost:3003');
 
 ws.on('open', () => {
   console.log('✅ Connected to server');

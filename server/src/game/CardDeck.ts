@@ -7,27 +7,33 @@ import { Card, Suit, Rank } from '@havoc-speedway/shared';
 export class CardDeck {
     private cards: Card[];
     private discardPile: Card[];
+    private isDoubleDeck: boolean;
 
-    constructor() {
+    constructor(doubleDeck: boolean = false) {
         this.cards = [];
         this.discardPile = [];
+        this.isDoubleDeck = doubleDeck;
         this.initializeDeck();
         this.shuffle();
     }
 
     /**
-     * Initialize a standard 52-card deck
-     * Note: Using Storm Rules cards (7 through A only)
+     * Initialize deck with Storm Rules cards (7 through A only)
+     * Single deck = 32 cards, Double deck = 64 cards
      */
     private initializeDeck(): void {
         this.cards = [];
         const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
         const ranks: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
-        for (const suit of suits) {
-            for (const rank of ranks) {
-                const id = `${rank}_of_${suit}`;
-                this.cards.push({ suit, rank, id });
+        const deckCount = this.isDoubleDeck ? 2 : 1;
+        
+        for (let deck = 0; deck < deckCount; deck++) {
+            for (const suit of suits) {
+                for (const rank of ranks) {
+                    const id = `${rank}_of_${suit}${this.isDoubleDeck ? `_deck${deck + 1}` : ''}`;
+                    this.cards.push({ suit, rank, id });
+                }
             }
         }
     }
@@ -114,9 +120,8 @@ export class CardDeck {
     }
 
     /**
-     * Get the numeric value of a card for comparison
-     * Used for dealer selection (highest card wins)
-     * Storm Rules uses cards 7-A only
+     * Get the numeric value of a card for comparison (7 low, Ace high)
+     * Used for dealer selection where lowest card wins
      */
     static getCardValue(card: Card): number {
         switch (card.rank) {
@@ -133,11 +138,56 @@ export class CardDeck {
     }
 
     /**
-     * Reset the deck to initial state with all 32 cards (Storm Rules)
+     * Deal cards for dealer selection (18 cards for 3x6 grid)
      */
-    reset(): void {
+    dealDealerSelectionCards(): Card[] {
+        return this.dealCards(18);
+    }
+
+    /**
+     * Get the top card of the discard pile
+     */
+    getTopDiscardCard(): Card | null {
+        return this.discardPile.length > 0 ? this.discardPile[this.discardPile.length - 1] : null;
+    }
+
+    /**
+     * Reset the deck to initial state
+     */
+    reset(doubleDeck?: boolean): void {
+        if (doubleDeck !== undefined) {
+            this.isDoubleDeck = doubleDeck;
+        }
         this.initializeDeck();
         this.discardPile = [];
         this.shuffle();
+    }
+
+    /**
+     * Get remaining cards in deck
+     */
+    getRemainingCards(): Card[] {
+        return [...this.cards];
+    }
+
+    /**
+     * Get bottom card from deck
+     */
+    getBottomCard(): Card | null {
+        return this.cards.length > 0 ? this.cards[0] : null;
+    }
+
+    /**
+     * Add cards back to deck (for reshuffling)
+     */
+    addCards(cards: Card[]): void {
+        this.cards.push(...cards);
+    }
+
+    /**
+     * Check if this is a double deck
+     */
+    get isDouble(): boolean {
+        return this.isDoubleDeck;
     }
 }

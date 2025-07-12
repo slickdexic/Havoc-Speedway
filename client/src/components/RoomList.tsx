@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { GameSettings } from '@havoc-speedway/shared';
 
 interface Room {
   id: string;
@@ -8,16 +9,18 @@ interface Room {
   stage: string;
   isPublic: boolean;
   code: string;
+  settings: GameSettings;
 }
 
 interface RoomListProps {
   rooms: Room[];
   onJoinRoom: (roomId: string) => void;
   isConnected: boolean;
+  canJoinRooms: boolean;
   onRefresh: () => void;
 }
 
-export function RoomList({ rooms, onJoinRoom, isConnected, onRefresh }: RoomListProps) {
+export function RoomList({ rooms, onJoinRoom, isConnected, canJoinRooms, onRefresh }: RoomListProps) {
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -84,14 +87,19 @@ export function RoomList({ rooms, onJoinRoom, isConnected, onRefresh }: RoomList
                 <div className="room-code">
                   🎯 Code: {room.code}
                 </div>
+
+                <div className="room-settings">
+                  🎮 {room.settings.numberOfLaps}L • {room.settings.numberOfDice}D • {room.settings.numberOfDecks}K • {room.settings.cardsPerHand}C • {room.settings.numberOfCoins}💰
+                </div>
               </div>
 
               <button
                 className="join-button"
                 onClick={() => onJoinRoom(room.id)}
-                disabled={room.playerCount >= room.maxPlayers || room.stage === 'storm_rules'}
+                disabled={!canJoinRooms || room.playerCount >= room.maxPlayers || room.stage === 'storm_rules'}
               >
-                {room.playerCount >= room.maxPlayers ? 'Room Full' : 
+                {!canJoinRooms ? 'Enter Name to Join' :
+                 room.playerCount >= room.maxPlayers ? 'Room Full' : 
                  room.stage === 'storm_rules' ? 'Game In Progress' : 'Join Room'}
               </button>
             </div>

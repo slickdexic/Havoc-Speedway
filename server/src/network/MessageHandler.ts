@@ -89,6 +89,22 @@ export class MessageHandler {
         this.handleLeaveRoom(ws);
         break;
       
+      case 'change_settings':
+        this.handleChangeSettings(ws, message);
+        break;
+      
+      case 'kick_player':
+        this.handleKickPlayer(ws, message);
+        break;
+      
+      case 'change_color':
+        this.handleChangeColor(ws, message);
+        break;
+      
+      case 'send_message':
+        this.handleSendMessage(ws, message);
+        break;
+      
       default:
         console.log('❓ Unknown message type:', message.type);
         this.sendError(ws, 'Unknown message type');
@@ -96,10 +112,10 @@ export class MessageHandler {
   }
 
   private handleCreateRoom(ws: WebSocket, message: any): void {
-    const { playerName, roomName } = message;
+    const { playerName, roomName, settings } = message;
     
-    // Create default game settings
-    const settings = {
+    // Use provided settings or create defaults
+    const gameSettings = settings || {
       numberOfLaps: 2 as 1 | 2 | 3 | 4 | 5,
       numberOfDice: 1 as 1 | 2,
       numberOfDecks: 1 as 1 | 2,
@@ -116,7 +132,7 @@ export class MessageHandler {
       isConnected: true
     };
 
-    const roomId = this.gameServer.createRoom(player, roomName, settings);
+    const roomId = this.gameServer.createRoom(player, roomName, gameSettings);
     
     const connection = this.connections.get(ws);
     if (connection) {
@@ -205,7 +221,8 @@ export class MessageHandler {
       maxPlayers: 4,
       stage: room.status === 'waiting' ? 'waiting' : room.currentStage,
       isPublic: true, // TODO: Add isPublic to Room interface
-      code: room.id.substring(0, 6).toUpperCase() // Generate readable room code
+      code: room.id.substring(0, 6).toUpperCase(), // Generate readable room code
+      settings: room.settings
     }));
     
     this.send(ws, {
@@ -239,6 +256,8 @@ export class MessageHandler {
       return;
     }
 
+    console.log(`🎮 Player action from ${connection.playerId}: ${message.action?.type || 'unknown'}`);
+
     const success = this.gameServer.handlePlayerAction(
       connection.roomId, 
       connection.playerId, 
@@ -246,12 +265,19 @@ export class MessageHandler {
     );
 
     if (success) {
+      // Get updated game state after action
+      const updatedGameState = this.gameServer.getGameState(connection.roomId);
+      
+      // Broadcast the updated state to all players in the room
       this.broadcastToRoom(connection.roomId, {
-        type: 'game-updated',
-        gameState: this.gameServer.getGameState(connection.roomId)
+        type: 'game_state_update',
+        gameState: this.serializeGameState(updatedGameState)
       });
+
+      console.log(`✅ Player action processed successfully`);
     } else {
-      this.sendError(ws, 'Invalid action');
+      console.log(`❌ Player action failed`);
+      this.sendError(ws, 'Invalid action or not your turn');
     }
   }
 
@@ -323,16 +349,100 @@ export class MessageHandler {
     // Convert players Map to array for client compatibility
     const players = Array.from(gameState.room.players.values());
     
-    return {
+    // Base game state
+    const serialized = {
       stage: gameState.stage,
       roomId: gameState.room.id,
       roomName: gameState.room.name,
       players: players,
-      currentPlayerIndex: gameState.currentPlayerIndex,
-      dealerIndex: gameState.dealerIndex,
-      dealerCards: gameState.dealerCards,
+      roundNumber: gameState.roundNumber || 0,
+      dealerButton: gameState.dealerButton,
+      stormWinningOrder: gameState.stormWinningOrder || [],
+      settings: gameState.room.settings,
       message: gameState.message
     };
+
+    // Add stage-specific data
+    switch (gameState.stage) {
+      case 'dealer-selection':
+        if (gameState.dealerSelection) {
+          (serialized as any).dealerSelection = {
+            dealerCards: gameState.dealerSelection.dealerCards,
+            selectedCards: this.mapToObject(gameState.dealerSelection.selectedCards),
+            currentSelectingPlayerId: gameState.dealerSelection.currentSelectingPlayerId,
+            dealerId: gameState.dealerSelection.dealerId,
+            isComplete: gameState.dealerSelection.isComplete
+          };
+        }
+        break;
+
+      case 'storm':
+        if (gameState.storm) {
+          (serialized as any).storm = {
+            playerHands: this.mapToObject(gameState.storm.playerHands),
+            discardPile: gameState.storm.discardPile,
+            currentPlayerId: gameState.storm.currentPlayerId,
+            toxicSevenActive: gameState.storm.toxicSevenActive,
+            toxicDrawAmount: gameState.storm.toxicDrawAmount,
+            calledSuit: gameState.storm.calledSuit,
+            finishingOrder: gameState.storm.finishingOrder,
+            isComplete: gameState.storm.isComplete
+          };
+        }
+        break;
+
+      case 'lane-selection':
+        if (gameState.laneSelection) {
+          (serialized as any).laneSelection = {
+            availableLanes: gameState.laneSelection.availableLanes,
+            selectedLanes: this.mapToObject(gameState.laneSelection.selectedLanes),
+            currentSelector: gameState.laneSelection.currentSelector,
+            allLanesSelected: gameState.laneSelection.allLanesSelected
+          };
+        }
+        break;
+
+      case 'coin':
+        if (gameState.coinStage) {
+          (serialized as any).coinStage = {
+            coinDistribution: this.mapToObject(gameState.coinStage.coinDistribution),
+            drawnCoins: this.mapToObject(gameState.coinStage.drawnCoins),
+            placedCoins: gameState.coinStage.placedCoins,
+            currentPlacer: gameState.coinStage.currentPlacer,
+            allCoinsPlaced: gameState.coinStage.allCoinsPlaced
+          };
+        }
+        break;
+
+      case 'racing':
+        if (gameState.racing) {
+          (serialized as any).racing = {
+            pawns: this.mapToObject(gameState.racing.pawns),
+            coins: this.mapToObject(gameState.racing.coins),
+            currentRacingPlayer: gameState.racing.currentRacingPlayer,
+            raceFinished: gameState.racing.raceFinished,
+            finishingOrder: gameState.racing.finishingOrder,
+            lapTarget: gameState.racing.lapTarget,
+            pendingMovement: gameState.racing.pendingMovement
+          };
+        }
+        break;
+    }
+    
+    return serialized;
+  }
+
+  /**
+   * Convert Map to plain object for JSON serialization
+   */
+  private mapToObject(map: Map<any, any> | undefined): any {
+    if (!map) return {};
+    
+    const obj: any = {};
+    for (const [key, value] of map) {
+      obj[key] = value;
+    }
+    return obj;
   }
 
   private send(ws: WebSocket, message: any): void {
@@ -353,6 +463,178 @@ export class MessageHandler {
       if (connection.roomId === roomId && ws !== exclude) {
         this.send(ws, message);
       }
+    }
+  }
+
+  private handleChangeSettings(ws: WebSocket, message: any): void {
+    const connection = this.connections.get(ws);
+    if (!connection?.roomId || !connection?.playerId) {
+      this.sendError(ws, 'Not in a room');
+      return;
+    }
+
+    const gameState = this.gameServer.getGameState(connection.roomId);
+    if (!gameState) {
+      this.sendError(ws, 'Room not found');
+      return;
+    }
+
+    // Check if player is host
+    const player = Array.from(gameState.room.players.values()).find((p: any) => p.id === connection.playerId);
+    if (!player?.isHost) {
+      this.sendError(ws, 'Only host can change settings');
+      return;
+    }
+
+    // Update room settings
+    gameState.room.settings = { ...message.settings };
+    
+    // Broadcast updated room state to all players
+    this.broadcastToRoom(connection.roomId, {
+      type: 'room-updated',
+      gameState: this.serializeGameState(gameState)
+    });
+
+    console.log(`⚙️ Settings changed in room ${gameState.room.name} by ${player.name}`);
+  }
+
+  private handleKickPlayer(ws: WebSocket, message: any): void {
+    const connection = this.connections.get(ws);
+    if (!connection?.roomId || !connection?.playerId) {
+      this.sendError(ws, 'Not in a room');
+      return;
+    }
+
+    const gameState = this.gameServer.getGameState(connection.roomId);
+    if (!gameState) {
+      this.sendError(ws, 'Room not found');
+      return;
+    }
+
+    // Check if player is host
+    const host = Array.from(gameState.room.players.values()).find((p: any) => p.id === connection.playerId);
+    if (!host?.isHost) {
+      this.sendError(ws, 'Only host can kick players');
+      return;
+    }
+
+    const targetPlayer = Array.from(gameState.room.players.values()).find((p: any) => p.id === message.playerId);
+    if (!targetPlayer) {
+      this.sendError(ws, 'Player not found');
+      return;
+    }
+
+    if (targetPlayer.isHost) {
+      this.sendError(ws, 'Cannot kick the host');
+      return;
+    }
+
+    // Find the player's connection and close it
+    for (const [playerWs, playerConnection] of this.connections) {
+      if (playerConnection.playerId === message.playerId) {
+        this.send(playerWs, {
+          type: 'kicked',
+          message: `You have been kicked from ${gameState.room.name}`
+        });
+        playerConnection.roomId = undefined;
+        playerConnection.playerId = undefined;
+        break;
+      }
+    }
+
+    // Remove player from room
+    this.gameServer.leaveRoom(connection.roomId, message.playerId);
+
+    // Broadcast updated room state
+    const updatedGameState = this.gameServer.getGameState(connection.roomId);
+    if (updatedGameState) {
+      this.broadcastToRoom(connection.roomId, {
+        type: 'room-updated',
+        gameState: this.serializeGameState(updatedGameState)
+      });
+    }
+
+    console.log(`👢 Player ${targetPlayer.name} kicked from room ${gameState.room.name} by ${host.name}`);
+  }
+
+  private handleChangeColor(ws: WebSocket, message: any): void {
+    const connection = this.connections.get(ws);
+    if (!connection?.roomId || !connection?.playerId) {
+      this.sendError(ws, 'Not in a room');
+      return;
+    }
+
+    const gameState = this.gameServer.getGameState(connection.roomId);
+    if (!gameState) {
+      this.sendError(ws, 'Room not found');
+      return;
+    }
+
+    const player = Array.from(gameState.room.players.values()).find((p: any) => p.id === connection.playerId);
+    if (!player) {
+      this.sendError(ws, 'Player not found');
+      return;
+    }
+
+    // Check if color is available
+    const isColorTaken = Array.from(gameState.room.players.values()).some((p: any) => p.id !== player.id && p.color === message.color);
+    if (isColorTaken) {
+      this.sendError(ws, 'Color already taken');
+      return;
+    }
+
+    // Update player color
+    player.color = message.color;
+
+    // Broadcast updated room state
+    this.broadcastToRoom(connection.roomId, {
+      type: 'room-updated',
+      gameState: this.serializeGameState(gameState)
+    });
+
+    console.log(`🎨 Player ${player.name} changed color to ${message.color}`);
+  }
+
+  private handleSendMessage(ws: WebSocket, message: any): void {
+    const connection = this.connections.get(ws);
+    if (!connection?.roomId || !connection?.playerId) {
+      this.sendError(ws, 'Not in a room');
+      return;
+    }
+
+    const gameState = this.gameServer.getGameState(connection.roomId);
+    if (!gameState) {
+      this.sendError(ws, 'Room not found');
+      return;
+    }
+
+    const player = Array.from(gameState.room.players.values()).find((p: any) => p.id === connection.playerId);
+    if (!player) {
+      this.sendError(ws, 'Player not found');
+      return;
+    }
+
+    const chatMessage = {
+      type: 'chat-message',
+      id: require('crypto').randomUUID(),
+      sender: player.name,
+      content: message.content,
+      isPrivate: message.isPrivate || false,
+      timestamp: Date.now()
+    };
+
+    if (message.isPrivate && message.targetPlayerId) {
+      // Send private message to specific player
+      for (const [playerWs, playerConnection] of this.connections) {
+        if (playerConnection.playerId === message.targetPlayerId || playerConnection.playerId === connection.playerId) {
+          this.send(playerWs, chatMessage);
+        }
+      }
+      console.log(`💬 Private message from ${player.name} to player ${message.targetPlayerId}`);
+    } else {
+      // Broadcast to all players in room
+      this.broadcastToRoom(connection.roomId, chatMessage);
+      console.log(`💬 Room message from ${player.name}: ${message.content}`);
     }
   }
 }

@@ -3,6 +3,7 @@ import { AutoCompleteInput } from './AutoCompleteInput';
 import { RoomList } from './RoomList';
 import { CreateRoomForm } from './CreateRoomForm';
 import { JoinWithCode } from './JoinWithCode';
+import type { GameSettings } from '@havoc-speedway/shared';
 
 interface Room {
   id: string;
@@ -12,6 +13,7 @@ interface Room {
   stage: string;
   isPublic: boolean;
   code: string;
+  settings: GameSettings;
 }
 
 interface LobbyProps {
@@ -20,7 +22,7 @@ interface LobbyProps {
   rooms: Room[];
   onJoin: (playerName: string, roomId: string) => void;
   onJoinWithCode: (playerName: string, roomCode: string) => void;
-  onCreate: (playerName: string, roomName: string, isPublic: boolean) => void;
+  onCreate: (playerName: string, roomName: string, isPublic: boolean, settings: GameSettings) => void;
   onRefreshRooms: () => void;
 }
 
@@ -87,8 +89,8 @@ export function Lobby({
     setTimeout(() => setIsJoining(false), 2000);
   };
 
-  const handleCreateRoom = async (roomName: string, isPublic: boolean) => {
-    console.log('Lobby handleCreateRoom called with:', { playerName: playerName.trim(), roomName, isPublic });
+  const handleCreateRoom = async (roomName: string, isPublic: boolean, settings: GameSettings) => {
+    console.log('Lobby handleCreateRoom called with:', { playerName: playerName.trim(), roomName, isPublic, settings });
     if (!playerName.trim()) {
       console.log('Player name is empty, returning');
       return;
@@ -96,7 +98,7 @@ export function Lobby({
     
     setIsCreating(true);
     console.log('Calling onCreate prop');
-    onCreate(playerName.trim(), roomName, isPublic);
+    onCreate(playerName.trim(), roomName, isPublic, settings);
     
     // Save player name to autocomplete
     const storageKey = 'havoc-speedway-player-names';
@@ -171,7 +173,8 @@ export function Lobby({
           <RoomList
             rooms={rooms}
             onJoinRoom={handleJoinRoom}
-            isConnected={isConnected && !!playerName.trim()}
+            isConnected={isConnected}
+            canJoinRooms={isConnected && !!playerName.trim()}
             onRefresh={onRefreshRooms}
           />
         </div>

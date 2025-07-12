@@ -1,6 +1,6 @@
 // Game Flow and State Management Types
 
-import { Card, StormGameState } from './cards.js';
+import { Card, StormGameState, DealerSelectionState } from './cards.js';
 import { Lane, Coin, RacingState } from './racing.js';
 
 export type GameStage = 
@@ -48,15 +48,6 @@ export interface Room {
   status: 'waiting' | 'in-progress' | 'finished';
   currentStage: GameStage;
   createdAt: number;
-}
-
-// Dealer selection state
-export interface DealerSelectionState {
-  availableCards: Card[]; // 18 cards in 3x6 grid
-  selectedCards: Map<string, Card>; // playerId -> selected card
-  currentSelector: string; // which player's turn to select
-  dealerDetermined: boolean;
-  dealerId?: string;
 }
 
 // Lane selection state

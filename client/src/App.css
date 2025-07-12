@@ -1,5 +1,8 @@
-/* Havoc Speedway - Professional Lobby System Styles */
+/* Import enhanced design system */
+@import url('./styles/design-system.css');
+@import url('./styles/game-ui.css');
 
+/* Global reset and base styles */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,15 +10,16 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  color: #ffffff;
+  font-family: var(--font-family-primary);
+  background: var(--bg-gradient-primary);
+  color: white;
   min-height: 100vh;
+  line-height: 1.6;
 }
 
 .app {
   min-height: 100vh;
-  padding: 20px;
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -319,9 +323,19 @@ body {
   gap: 8px;
 }
 
-.player-count, .room-visibility {
+.player-count, .room-visibility, .room-code, .room-settings {
   font-size: 0.9rem;
   color: #ccc;
+}
+
+.room-settings {
+  font-family: 'Courier New', monospace;
+  color: #4ecdc4;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  background: rgba(78, 205, 196, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(78, 205, 196, 0.3);
 }
 
 .join-button {
@@ -364,6 +378,57 @@ body {
 
 .room-options {
   margin: 20px 0;
+}
+
+.game-settings {
+  margin: 20px 0;
+}
+
+.game-settings h4 {
+  color: #4ecdc4;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.setting-group label {
+  color: #ccc;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.setting-group select {
+  padding: 8px 12px;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.setting-group select:focus {
+  outline: none;
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.setting-group select option {
+  background: #1a1a2e;
+  color: #ffffff;
 }
 
 .checkbox-label {
@@ -824,4 +889,609 @@ body {
     min-height: auto;
     padding: 10px 0;
   }
+}
+
+/* Game Room Styles */
+.game-room {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #ddd;
+}
+
+.room-title h1 {
+  margin: 0;
+  color: #333;
+  font-size: 2em;
+}
+
+.room-stage {
+  margin-top: 5px;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.stage {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.stage.waiting {
+  background-color: #ffeaa7;
+  color: #636e72;
+}
+
+.stage.dealer-selection {
+  background-color: #74b9ff;
+  color: white;
+}
+
+.stage.storm {
+  background-color: #fd79a8;
+  color: white;
+}
+
+.stage.lane-selection {
+  background-color: #6c5ce7;
+  color: white;
+}
+
+.stage.coin {
+  background-color: #a29bfe;
+  color: white;
+}
+
+.stage.racing {
+  background-color: #00b894;
+  color: white;
+}
+
+.header-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.settings-button,
+.leave-room-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.settings-button {
+  background-color: #74b9ff;
+  color: white;
+}
+
+.leave-room-button {
+  background-color: #e17055;
+  color: white;
+}
+
+.game-message {
+  background-color: #dff0d8;
+  border: 1px solid #d6e9c6;
+  color: #3c763d;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-weight: bold;
+}
+
+/* Settings Panel */
+.settings-panel {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.settings-panel h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.setting-item label {
+  font-weight: bold;
+  color: #555;
+}
+
+.setting-item select {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+}
+
+/* Players Section */
+.players-section {
+  margin-bottom: 20px;
+}
+
+.players-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.player-card {
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+.player-card.current-player {
+  border-color: #74b9ff;
+  background-color: #f8fcff;
+}
+
+.player-card.dealer {
+  border-color: #00b894;
+  background-color: #f0fff4;
+}
+
+.player-card.empty-slot {
+  border-style: dashed;
+  background-color: #f8f9fa;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+}
+
+.player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.player-info {
+  flex: 1;
+}
+
+.player-name {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.player-color {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: bold;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.color-yellow { background-color: #fdcb6e; color: #2d3436; }
+.color-orange { background-color: #e17055; color: white; }
+.color-red { background-color: #d63031; color: white; }
+.color-pink { background-color: #fd79a8; color: white; }
+.color-purple { background-color: #6c5ce7; color: white; }
+.color-blue { background-color: #74b9ff; color: white; }
+.color-green { background-color: #00b894; color: white; }
+.color-black { background-color: #2d3436; color: white; }
+
+.player-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.kick-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.kick-button:hover {
+  background-color: #ff7675;
+}
+
+.color-changer select {
+  padding: 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.8em;
+}
+
+.private-message-button {
+  background-color: #74b9ff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  margin-top: 8px;
+}
+
+.private-message-button:hover {
+  background-color: #0984e3;
+}
+
+/* Game Controls */
+.game-controls {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.start-game-button {
+  background-color: #00b894;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 1.1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.start-game-button:hover {
+  background-color: #00a085;
+}
+
+/* Chat Section */
+.chat-section {
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.chat-header h3 {
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.chat-messages {
+  height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: white;
+  margin-bottom: 15px;
+}
+
+.no-messages {
+  color: #999;
+  text-align: center;
+  font-style: italic;
+  padding: 20px;
+}
+
+.message {
+  margin-bottom: 8px;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.message.public {
+  background-color: #f8f9fa;
+}
+
+.message.private {
+  background-color: #fff3cd;
+  border-left: 3px solid #ffc107;
+}
+
+.message-sender {
+  font-weight: bold;
+  color: #333;
+  margin-right: 8px;
+}
+
+.message-content {
+  color: #555;
+}
+
+.private-indicator {
+  margin-left: 8px;
+  font-size: 0.8em;
+}
+
+.chat-input {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-chat,
+.private-chat-input {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input-field {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.send-button {
+  background-color: #74b9ff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.send-button:hover {
+  background-color: #0984e3;
+}
+
+.private-chat {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.private-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #856404;
+}
+
+.close-private {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1em;
+}
+
+/* Stage-specific content */
+.stage-content {
+  margin: 20px 0;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.stage-placeholder {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+}
+
+/* Dealer Selection Stage */
+.dealer-selection-stage {
+  text-align: center;
+}
+
+.dealer-selection-content {
+  margin-top: 20px;
+}
+
+.turn-indicator {
+  margin-bottom: 20px;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.your-turn {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+  font-weight: bold;
+}
+
+.waiting-turn {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.dealer-card {
+  aspect-ratio: 2/3;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.8em;
+}
+
+.dealer-card.clickable:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.dealer-card.flipped {
+  background-color: #f8f9fa;
+  border-color: #6c757d;
+}
+
+.card-back {
+  font-size: 1.5em;
+  color: #6c757d;
+}
+
+.card-face {
+  text-align: center;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.dealer-determined {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 8px;
+  padding: 20px;
+  color: #155724;
+}
+
+/* Storm Stage */
+.storm-stage {
+  text-align: center;
+}
+
+.storm-content {
+  margin-top: 20px;
+  display: grid;
+  gap: 20px;
+}
+
+.discard-pile {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.top-card {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #333;
+}
+
+.called-suit {
+  font-size: 0.9em;
+  color: #007bff;
+  margin-top: 5px;
+}
+
+.toxic-warning {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+  padding: 10px;
+  border-radius: 6px;
+  margin-top: 10px;
+}
+
+.player-hand {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.hand-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.card {
+  background-color: #fff;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.card.clickable:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.actions {
+  margin-top: 15px;
+}
+
+.draw-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.draw-button:hover {
+  background-color: #545b62;
+}
+
+.finishing-order {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.finishing-order ol {
+  list-style: none;
+  counter-reset: position;
+  padding: 0;
+}
+
+.finishing-order li {
+  counter-increment: position;
+  padding: 5px 0;
+  font-weight: bold;
+}
+
+.finishing-order li::before {
+  content: counter(position) ". ";
+  color: #007bff;
+  font-weight: bold;
 }
