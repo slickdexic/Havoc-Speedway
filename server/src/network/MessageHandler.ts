@@ -2,7 +2,7 @@
 
 import { WebSocket } from 'ws';
 import { GameServer } from '../game/GameServer.js';
-import { Player } from '@havoc-speedway/shared';
+import { Player, PlayerColor } from '@havoc-speedway/shared';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ClientConnection {
@@ -41,7 +41,7 @@ export class MessageHandler {
     if (connection?.playerId && connection?.roomId) {
       this.gameServer.leaveRoom(connection.roomId, connection.playerId);
       this.broadcastToRoom(connection.roomId, {
-        type: 'player-left',
+        type: 'player_left',
         playerId: connection.playerId
       });
     }
@@ -105,6 +105,10 @@ export class MessageHandler {
         this.handleSendMessage(ws, message);
         break;
       
+      case 'change_name':
+        this.handleChangeName(ws, message);
+        break;
+      
       default:
         console.log('❓ Unknown message type:', message.type);
         this.sendError(ws, 'Unknown message type');
@@ -113,6 +117,27 @@ export class MessageHandler {
 
   private handleCreateRoom(ws: WebSocket, message: any): void {
     const { playerName, roomName, settings } = message;
+    
+    // Validate input
+    if (!playerName || typeof playerName !== 'string' || playerName.trim().length === 0) {
+      this.sendError(ws, 'Player name is required');
+      return;
+    }
+    
+    if (!roomName || typeof roomName !== 'string' || roomName.trim().length === 0) {
+      this.sendError(ws, 'Room name is required');
+      return;
+    }
+    
+    if (playerName.length > 20) {
+      this.sendError(ws, 'Player name too long (max 20 characters)');
+      return;
+    }
+    
+    if (roomName.length > 30) {
+      this.sendError(ws, 'Room name too long (max 30 characters)');
+      return;
+    }
     
     // Use provided settings or create defaults
     const gameSettings = settings || {
@@ -126,7 +151,7 @@ export class MessageHandler {
     const player: Player = {
       id: uuidv4(),
       name: playerName,
-      color: ['red', 'blue', 'green', 'yellow'][0] as any,
+      color: 'red' as PlayerColor,
       roomSlot: 1,
       isHost: true,
       isConnected: true
@@ -140,31 +165,52 @@ export class MessageHandler {
       connection.roomId = roomId;
     }
 
-    // Send room created confirmation and join the player to the room
-    this.send(ws, {
-      type: 'room_created',
-      roomId: roomId
-    });
-    
-    // Immediately send joined room state
+    // Send room joined confirmation with expected format
     const gameState = this.gameServer.getGameState(roomId);
-    const serializedGameState = this.serializeGameState(gameState);
+    if (!gameState || !gameState.room) {
+      this.sendError(ws, 'Failed to create room');
+      return;
+    }
+    
+    const room = gameState.room;
     
     this.send(ws, {
-      type: 'joined_room',
-      roomId: roomId,
-      gameState: serializedGameState
+      type: 'room_joined',
+      room: {
+        id: room.id,
+        name: room.name,
+        players: Array.from(room.players.values()),
+        settings: room.settings
+      },
+      isHost: true,
+      playerId: player.id
     });
   }
 
   private handleJoinRoom(ws: WebSocket, message: any): void {
     const { playerName, roomId } = message;
     
+    // Validate input
+    if (!playerName || typeof playerName !== 'string' || playerName.trim().length === 0) {
+      this.sendError(ws, 'Player name is required');
+      return;
+    }
+    
+    if (!roomId || typeof roomId !== 'string') {
+      this.sendError(ws, 'Room ID is required');
+      return;
+    }
+    
+    if (playerName.length > 20) {
+      this.sendError(ws, 'Player name too long (max 20 characters)');
+      return;
+    }
+    
     const player: Player = {
       id: uuidv4(),
       name: playerName,
-      color: ['red', 'green', 'yellow', 'purple'][Math.floor(Math.random() * 4)] as any,
-      roomSlot: 2, // Will be assigned by game server
+      color: 'blue' as PlayerColor,
+      roomSlot: 2, // Will be updated by game server
       isHost: false,
       isConnected: true
     };
@@ -178,16 +224,37 @@ export class MessageHandler {
         connection.roomId = roomId;
       }
 
-      // Send game state to the joining player
+      // Get the updated player with correct roomSlot from the game state
+      const gameState = this.gameServer.getGameState(roomId);
+      if (!gameState || !gameState.room) {
+        this.sendError(ws, 'Failed to join room');
+        return;
+      }
+      
+      const room = gameState.room;
+      const updatedPlayer = room.players.get(player.id);
+      
       this.send(ws, {
-        type: 'game_state_update',
-        gameState: this.serializeGameState(this.gameServer.getGameState(roomId))
+        type: 'room_joined',
+        room: {
+          id: room.id,
+          name: room.name,
+          players: Array.from(room.players.values()),
+          settings: room.settings
+        },
+        isHost: false,
+        playerId: updatedPlayer?.id || player.id
       });
 
-      // Notify all players in the room about the new player
+      // Notify all players in the room about room updates
       this.broadcastToRoom(roomId, {
-        type: 'game_state_update',
-        gameState: this.serializeGameState(this.gameServer.getGameState(roomId))
+        type: 'room_updated',
+        room: {
+          id: gameState.room.id,
+          name: gameState.room.name,
+          players: Array.from(gameState.room.players.values()),
+          settings: gameState.room.settings
+        }
       });
     } else {
       this.sendError(ws, 'Failed to join room - room may be full or not found');
@@ -213,20 +280,24 @@ export class MessageHandler {
   private handleGetRooms(ws: WebSocket): void {
     const rooms = this.gameServer.getAllRooms();
     
-    // Transform rooms to include codes and match client expectations
-    const roomsData = rooms.map(room => ({
-      id: room.id,
-      name: room.name,
-      playerCount: room.players.size,
-      maxPlayers: 4,
-      stage: room.status === 'waiting' ? 'waiting' : room.currentStage,
-      isPublic: true, // TODO: Add isPublic to Room interface
-      code: room.id.substring(0, 6).toUpperCase(), // Generate readable room code
-      settings: room.settings
-    }));
+    // Transform rooms to match client expectations
+    const roomsData = rooms.map(room => {
+      const host = Array.from(room.players.values()).find(p => p.isHost);
+      if (!host) {
+        console.warn(`⚠️ Room ${room.id} has no host!`);
+      }
+      return {
+        id: room.id,
+        name: room.name,
+        hostName: host?.name || 'Unknown Host',
+        playerCount: room.players.size,
+        maxPlayers: 4,
+        isStarted: room.status !== 'waiting'
+      };
+    });
     
     this.send(ws, {
-      type: 'rooms_list',
+      type: 'room_list',
       rooms: roomsData
     });
   }
@@ -240,9 +311,10 @@ export class MessageHandler {
 
     const success = this.gameServer.startGame(connection.roomId);
     if (success) {
+      const gameState = this.gameServer.getGameState(connection.roomId);
       this.broadcastToRoom(connection.roomId, {
-        type: 'game_state_update',
-        gameState: this.serializeGameState(this.gameServer.getGameState(connection.roomId))
+        type: 'game_started',
+        gameState: this.serializeGameState(gameState)
       });
     } else {
       this.sendError(ws, 'Failed to start game');
@@ -293,7 +365,7 @@ export class MessageHandler {
     const player: Player = {
       id: uuidv4(),
       name: playerName,
-      color: ['red', 'green', 'yellow'][Math.floor(Math.random() * 3)] as any,
+      color: 'green' as PlayerColor,
       roomSlot: 2, // Will be assigned by game server
       isHost: false,
       isConnected: true
@@ -318,21 +390,32 @@ export class MessageHandler {
       return;
     }
 
-    const success = this.gameServer.leaveRoom(connection.roomId, connection.playerId);
+    const roomId = connection.roomId;
+    const success = this.gameServer.leaveRoom(roomId, connection.playerId);
     if (success) {
-      // Broadcast updated game state to remaining players in the room
-      this.broadcastToRoom(connection.roomId, {
-        type: 'game_state',
-        gameState: this.serializeGameState(this.gameServer.getGameState(connection.roomId))
-      });
-      
-      // Clear connection's room association
+      // Clear connection's room association first
       connection.roomId = undefined;
+      connection.playerId = undefined;
       
-      ws.send(JSON.stringify({
-        type: 'left_room',
+      // Broadcast updated room state to remaining players in the room (if any)
+      const gameState = this.gameServer.getGameState(roomId);
+      if (gameState) {
+        this.broadcastToRoom(roomId, {
+          type: 'room_updated',
+          room: {
+            id: gameState.room.id,
+            name: gameState.room.name,
+            players: Array.from(gameState.room.players.values()),
+            settings: gameState.room.settings
+          }
+        });
+      }
+      
+      // Confirm to the leaving player
+      this.send(ws, {
+        type: 'room_left',
         success: true
-      }));
+      });
     } else {
       this.sendError(ws, 'Failed to leave room');
     }
@@ -491,8 +574,13 @@ export class MessageHandler {
     
     // Broadcast updated room state to all players
     this.broadcastToRoom(connection.roomId, {
-      type: 'room-updated',
-      gameState: this.serializeGameState(gameState)
+      type: 'room_updated',
+      room: {
+        id: gameState.room.id,
+        name: gameState.room.name,
+        players: Array.from(gameState.room.players.values()),
+        settings: gameState.room.settings
+      }
     });
 
     console.log(`⚙️ Settings changed in room ${gameState.room.name} by ${player.name}`);
@@ -549,8 +637,13 @@ export class MessageHandler {
     const updatedGameState = this.gameServer.getGameState(connection.roomId);
     if (updatedGameState) {
       this.broadcastToRoom(connection.roomId, {
-        type: 'room-updated',
-        gameState: this.serializeGameState(updatedGameState)
+        type: 'room_updated',
+        room: {
+          id: updatedGameState.room.id,
+          name: updatedGameState.room.name,
+          players: Array.from(updatedGameState.room.players.values()),
+          settings: updatedGameState.room.settings
+        }
       });
     }
 
@@ -561,6 +654,15 @@ export class MessageHandler {
     const connection = this.connections.get(ws);
     if (!connection?.roomId || !connection?.playerId) {
       this.sendError(ws, 'Not in a room');
+      return;
+    }
+
+    const { color } = message;
+    
+    // Validate color
+    const validColors: PlayerColor[] = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
+    if (!color || !validColors.includes(color)) {
+      this.sendError(ws, 'Invalid color');
       return;
     }
 
@@ -577,19 +679,24 @@ export class MessageHandler {
     }
 
     // Check if color is available
-    const isColorTaken = Array.from(gameState.room.players.values()).some((p: any) => p.id !== player.id && p.color === message.color);
+    const isColorTaken = Array.from(gameState.room.players.values()).some((p: any) => p.id !== player.id && p.color === color);
     if (isColorTaken) {
       this.sendError(ws, 'Color already taken');
       return;
     }
 
     // Update player color
-    player.color = message.color;
+    player.color = color;
 
     // Broadcast updated room state
     this.broadcastToRoom(connection.roomId, {
-      type: 'room-updated',
-      gameState: this.serializeGameState(gameState)
+      type: 'room_updated',
+      room: {
+        id: gameState.room.id,
+        name: gameState.room.name,
+        players: Array.from(gameState.room.players.values()),
+        settings: gameState.room.settings
+      }
     });
 
     console.log(`🎨 Player ${player.name} changed color to ${message.color}`);
@@ -615,7 +722,7 @@ export class MessageHandler {
     }
 
     const chatMessage = {
-      type: 'chat-message',
+      type: 'message_received',
       id: require('crypto').randomUUID(),
       sender: player.name,
       content: message.content,
@@ -635,6 +742,98 @@ export class MessageHandler {
       // Broadcast to all players in room
       this.broadcastToRoom(connection.roomId, chatMessage);
       console.log(`💬 Room message from ${player.name}: ${message.content}`);
+    }
+  }
+
+  private handleChangeName(ws: WebSocket, message: any): void {
+    const { newName } = message;
+    
+    // Validate input
+    if (!newName || typeof newName !== 'string' || newName.trim().length === 0) {
+      this.sendError(ws, 'New name is required');
+      return;
+    }
+    
+    if (newName.length > 20) {
+      this.sendError(ws, 'Name too long (max 20 characters)');
+      return;
+    }
+    
+    const connection = this.connections.get(ws);
+    if (!connection) {
+      this.sendError(ws, 'Connection not found');
+      return;
+    }
+
+    const trimmedName = newName.trim();
+
+    // Handle name change in room context
+    if (connection.roomId && connection.playerId) {
+      const gameState = this.gameServer.getGameState(connection.roomId);
+      if (!gameState) {
+        this.sendError(ws, 'Room not found');
+        return;
+      }
+
+      const player = Array.from(gameState.room.players.values()).find((p: any) => p.id === connection.playerId);
+      if (!player) {
+        this.sendError(ws, 'Player not found');
+        return;
+      }
+
+      // Check if name is already taken by another player in the room
+      const nameExists = Array.from(gameState.room.players.values()).some((p: any) => 
+        p.id !== connection.playerId && p.name.toLowerCase() === trimmedName.toLowerCase()
+      );
+      
+      if (nameExists) {
+        this.sendError(ws, 'Name already taken by another player');
+        return;
+      }
+
+      // Update player name in room
+      const oldName = player.name;
+      player.name = trimmedName;
+
+      // Send confirmation to the player
+      this.send(ws, {
+        type: 'name_changed',
+        newName: trimmedName
+      });
+
+      // Broadcast updated room state to all players
+      this.broadcastToRoom(connection.roomId, {
+        type: 'room_updated',
+        room: {
+          id: gameState.room.id,
+          name: gameState.room.name,
+          players: Array.from(gameState.room.players.values()),
+          settings: gameState.room.settings
+        }
+      });
+
+      // Send a system message about the name change
+      const systemMessage = {
+        type: 'message_received',
+        id: require('crypto').randomUUID(),
+        sender: 'System',
+        content: `${oldName} changed their name to ${trimmedName}`,
+        isPrivate: false,
+        timestamp: Date.now()
+      };
+      
+      this.broadcastToRoom(connection.roomId, systemMessage);
+      
+      console.log(`👤 Player ${oldName} changed name to ${trimmedName} in room ${connection.roomId}`);
+    } else {
+      // Handle name change in lobby context (no room validation needed)
+      // Just send confirmation to the player
+      this.send(ws, {
+        type: 'name_changed',
+        newName: trimmedName
+      });
+      
+      console.log(`👤 Player changed name to ${trimmedName} in lobby`);
     }
   }
 }

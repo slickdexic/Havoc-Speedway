@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import type { GameSettings } from '@havoc-speedway/shared';
-
-interface Player {
-  id: string;
-  name: string;
-  color: string;
-  isHost?: boolean;
-  isConnected?: boolean;
-}
+import type { GameSettings, Player, PlayerColor } from '@havoc-speedway/shared';
 
 interface RoomProps {
   roomName: string;
@@ -21,6 +13,7 @@ interface RoomProps {
   onChangeSettings: (settings: GameSettings) => void;
   onChangeColor: (color: string) => void;
   onSendMessage: (message: string, isPrivate: boolean, targetPlayerId?: string) => void;
+  onChangeName: (newName: string) => void;
   chatMessages: Array<{
     id: string;
     sender: string;
@@ -42,12 +35,18 @@ export function Room({
   onChangeSettings,
   onChangeColor,
   onSendMessage,
+  onChangeName,
   chatMessages
 }: RoomProps) {
   const [message, setMessage] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showNameChange, setShowNameChange] = useState(false);
+  const [newName, setNewName] = useState('');
 
-  const availableColors = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
+  // Debug logging
+  console.log('Room component render - players:', players.map(p => `${p.name} (${p.id.slice(0,8)})`));
+
+  const availableColors: PlayerColor[] = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
   const usedColors = players.map(p => p.color);
   const unusedColors = availableColors.filter(color => !usedColors.includes(color));
   
@@ -57,6 +56,14 @@ export function Room({
     if (message.trim()) {
       onSendMessage(message.trim(), false);
       setMessage('');
+    }
+  };
+
+  const handleChangeName = () => {
+    if (newName.trim()) {
+      onChangeName(newName.trim());
+      setNewName('');
+      setShowNameChange(false);
     }
   };
 
@@ -212,18 +219,64 @@ export function Room({
 
                         <div className="player-actions">
                           {player.id === currentPlayerId && (
-                            <div className="color-selection">
-                              <label>Color:</label>
-                              <select 
-                                value={player.color}
-                                onChange={(e) => onChangeColor(e.target.value)}
-                              >
-                                <option value={player.color}>{player.color}</option>
-                                {unusedColors.map(color => (
-                                  <option key={color} value={color}>{color}</option>
-                                ))}
-                              </select>
-                            </div>
+                            <>
+                              <div className="color-selection">
+                                <label>Color:</label>
+                                <select 
+                                  value={player.color}
+                                  onChange={(e) => onChangeColor(e.target.value)}
+                                >
+                                  <option value={player.color}>{player.color}</option>
+                                  {unusedColors.map(color => (
+                                    <option key={color} value={color}>{color}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              
+                              <div className="name-change-section">
+                                {!showNameChange ? (
+                                  <button 
+                                    className="btn btn-ghost btn-small"
+                                    onClick={() => {
+                                      setNewName(player.name);
+                                      setShowNameChange(true);
+                                    }}
+                                    title="Change your name"
+                                  >
+                                    ✏️ Change Name
+                                  </button>
+                                ) : (
+                                  <div className="name-change-form">
+                                    <input
+                                      type="text"
+                                      value={newName}
+                                      onChange={(e) => setNewName(e.target.value)}
+                                      placeholder="Enter new name..."
+                                      maxLength={20}
+                                      autoFocus
+                                    />
+                                    <div className="form-actions">
+                                      <button 
+                                        className="btn btn-primary btn-small"
+                                        onClick={handleChangeName}
+                                        disabled={!newName.trim() || newName.trim() === player.name}
+                                      >
+                                        Save
+                                      </button>
+                                      <button 
+                                        className="btn btn-ghost btn-small"
+                                        onClick={() => {
+                                          setShowNameChange(false);
+                                          setNewName('');
+                                        }}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           )}
                           
                           {isHost && player.id !== currentPlayerId && (

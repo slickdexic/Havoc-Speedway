@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unique Name Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .name-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🏁 Havoc Speedway - Unique Name Test</h1>
+        <div class="info">
+            <strong>Instructions:</strong>
+            <ol>
+                <li>Open this file in multiple browser tabs</li>
+                <li>Each tab should show a different player name</li>
+                <li>Use the buttons to test name persistence and changes</li>
+            </ol>
+        </div>
+        
+        <h2>Current Player Name:</h2>
+        <div class="name-display" id="playerNameDisplay"></div>
+        
+        <div>
+            <button onclick="generateName()">Generate New Name</button>
+            <button onclick="changeName()">Change Name</button>
+            <button onclick="clearStorage()">Clear All Storage</button>
+            <button onclick="showStorage()">Show Storage Contents</button>
+        </div>
+        
+        <div id="storageInfo" class="info" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Simulate the logic from App.tsx
+        function getPlayerName() {
+            // Try to get name from sessionStorage first (unique per tab)
+            const sessionName = sessionStorage.getItem('havoc-speedway-player-name');
+            if (sessionName) return sessionName;
+            
+            // Try localStorage as fallback
+            const savedName = localStorage.getItem('havoc-speedway-player-name');
+            if (savedName) {
+                // Add random suffix to make it unique for this tab
+                const uniqueName = `${savedName}_${Math.floor(Math.random() * 100)}`;
+                sessionStorage.setItem('havoc-speedway-player-name', uniqueName);
+                return uniqueName;
+            }
+            
+            // Generate completely new name
+            const randomName = `Player${Math.floor(Math.random() * 1000)}`;
+            localStorage.setItem('havoc-speedway-player-name', randomName);
+            sessionStorage.setItem('havoc-speedway-player-name', randomName);
+            return randomName;
+        }
+
+        function updateDisplay() {
+            const playerName = getPlayerName();
+            document.getElementById('playerNameDisplay').textContent = playerName;
+        }
+
+        function generateName() {
+            const randomName = `Player${Math.floor(Math.random() * 1000)}`;
+            localStorage.setItem('havoc-speedway-player-name', randomName);
+            sessionStorage.setItem('havoc-speedway-player-name', randomName);
+            updateDisplay();
+        }
+
+        function changeName() {
+            const newName = prompt('Enter new name:');
+            if (newName && newName.trim()) {
+                localStorage.setItem('havoc-speedway-player-name', newName.trim());
+                sessionStorage.setItem('havoc-speedway-player-name', newName.trim());
+                updateDisplay();
+            }
+        }
+
+        function clearStorage() {
+            localStorage.removeItem('havoc-speedway-player-name');
+            sessionStorage.removeItem('havoc-speedway-player-name');
+            updateDisplay();
+        }
+
+        function showStorage() {
+            const localStorage_name = localStorage.getItem('havoc-speedway-player-name');
+            const sessionStorage_name = sessionStorage.getItem('havoc-speedway-player-name');
+            
+            const info = document.getElementById('storageInfo');
+            info.innerHTML = `
+                <h3>Storage Contents:</h3>
+                <p><strong>localStorage:</strong> ${localStorage_name || 'null'}</p>
+                <p><strong>sessionStorage:</strong> ${sessionStorage_name || 'null'}</p>
+                <p><em>Note: sessionStorage is unique per tab, localStorage is shared across tabs</em></p>
+            `;
+            info.style.display = 'block';
+        }
+
+        // Initialize on page load
+        updateDisplay();
+
+        // Update display every 2 seconds to show any changes
+        setInterval(updateDisplay, 2000);
+    </script>
+</body>
+</html>

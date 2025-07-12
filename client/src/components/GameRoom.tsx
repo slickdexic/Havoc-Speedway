@@ -1,17 +1,8 @@
 import { useState, useEffect } from 'react';
-import type { GameSettings } from '@havoc-speedway/shared';
+import type { GameSettings, Player, PlayerColor } from '@havoc-speedway/shared';
 import { GameSounds, soundManager } from '../utils/SoundManager';
 import { GameAnimations } from '../utils/AnimationManager';
 import Track from './Track';
-
-interface Player {
-  id: string;
-  name: string;
-  color: string;
-  isDealer?: boolean;
-  isHost?: boolean;
-  isConnected?: boolean;
-}
 
 interface GameState {
   roomName: string;
@@ -144,7 +135,7 @@ export function GameRoom({
     }
   };
 
-  const availableColors = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
+  const availableColors: PlayerColor[] = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
   const usedColors = gameState.players.map(p => p.color);
   const unusedColors = availableColors.filter(color => !usedColors.includes(color));
 
@@ -325,7 +316,7 @@ export function GameRoom({
           {gameState.players.map((player, index) => (
             <div 
               key={player.id} 
-              className={`player-card ${player.isDealer ? 'dealer' : ''} ${player.id === currentPlayerId ? 'current-player' : ''} ${!player.isConnected ? 'disconnected' : ''} animate-fade-in hover-lift`}
+              className={`player-card ${player.id === currentPlayerId ? 'current-player' : ''} ${!player.isConnected ? 'disconnected' : ''} animate-fade-in hover-lift`}
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="player-header">
@@ -343,7 +334,6 @@ export function GameRoom({
                     <span className="name-text">{player.name}</span>
                     <div className="player-badges">
                       {player.isHost && <span className="badge badge-gold" title="Host">👑</span>}
-                      {player.isDealer && <span className="badge badge-info" title="Dealer">🎴</span>}
                       {!player.isConnected && <span className="badge badge-danger" title="Disconnected">⚠️</span>}
                     </div>
                   </div>
@@ -534,16 +524,12 @@ interface DealerSelectionStageProps {
 }
 
 function DealerSelectionStage({ gameState, currentPlayerId, onPlayerAction }: DealerSelectionStageProps) {
-  const dealerSelection = (gameState as any).dealerSelection; // Cast to access dealerSelection
+  const dealerSelection = (gameState as any).dealerSelection;
   
   if (!dealerSelection) {
     return (
       <div className="dealer-selection-stage">
-        <div className="stage-header">
-          <div className="stage-title">🎴 Dealer Selection</div>
-          <div className="stage-subtitle">Preparing the deck...</div>
-        </div>
-        <div className="loading skeleton skeleton-card"></div>
+        <div className="stage-loading">Loading dealer selection...</div>
       </div>
     );
   }
@@ -561,74 +547,110 @@ function DealerSelectionStage({ gameState, currentPlayerId, onPlayerAction }: De
   const isComplete = dealerSelection.isComplete;
 
   return (
-    <div className="dealer-selection-stage animate-fade-in">
-      <div className="stage-header">
-        <div className="stage-title">🎴 Dealer Selection</div>
-        <div className="stage-subtitle">Select a card to determine the dealer</div>
-      </div>
-      
-      {isComplete ? (
-        <div className="dealer-determined animate-slide-up">
-          <h4>🏆 Dealer Selected!</h4>
-          <p className="text-lg">
-            <strong>{gameState.players.find(p => p.id === dealerSelection.dealerId)?.name}</strong> is the dealer!
-          </p>
-          <div className="mt-4">
-            <div className="badge badge-success">Game Starting Soon</div>
-          </div>
-        </div>
-      ) : (
-        <div className="dealer-selection-content">
-          <div className={`turn-indicator ${isCurrentPlayersTurn ? 'your-turn animate-glow' : 'waiting-turn'}`}>
-            {isCurrentPlayersTurn ? (
-              <>
-                <div className="text-xl font-bold">🎯 Your Turn!</div>
-                <div className="text-base">Choose a card from the grid below</div>
-              </>
-            ) : (
-              <div className="text-lg">
-                ⏳ Waiting for <strong>{gameState.players.find(p => p.id === dealerSelection.currentSelectingPlayerId)?.name}</strong> to select...
-              </div>
-            )}
-          </div>
-          
-          <div className="card-grid">
-            {dealerSelection.dealerCards?.map((card: any, index: number) => (
-              <div
-                key={card.id || index}
-                data-card-id={card.id}
-                className={`dealer-card ${card.isFlipped ? 'flipped animate-card-flip' : ''} ${isCurrentPlayersTurn && !card.isFlipped ? 'clickable hover-lift' : ''}`}
-                onClick={() => isCurrentPlayersTurn && !card.isFlipped && handleCardClick(card.id)}
-                tabIndex={isCurrentPlayersTurn && !card.isFlipped ? 0 : -1}
-                onKeyPress={(e) => {
-                  if ((e.key === 'Enter' || e.key === ' ') && isCurrentPlayersTurn && !card.isFlipped) {
-                    e.preventDefault();
-                    handleCardClick(card.id);
-                  }
-                }}
-                aria-label={card.isFlipped ? `${card.rank} of ${card.suit}` : `Face-down card ${index + 1}`}
+    <div className="dealer-selection-stage">
+      {/* Player Cards at Top */}
+      <div className="player-cards-container">
+        <div className="player-cards">
+          {gameState.players.map((player) => {
+            const isCurrentPlayer = player.id === currentPlayerId;
+            const playerSelectedCard = dealerSelection.selectedCards?.[player.id];
+            
+            return (
+              <div 
+                key={player.id} 
+                className={`player-card ${isCurrentPlayer ? 'current-player' : ''}`}
               >
-                {card.isFlipped ? (
-                  <div className="card-face">
-                    <div className={`text-lg font-bold ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-danger' : 'text-gray-800'}`}>
-                      {card.rank}
-                    </div>
-                    <div className={`text-sm ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'text-danger' : 'text-gray-800'}`}>
-                      {card.suit}
+                {/* Player Name - centered above middle */}
+                <div className="player-name">{player.name}</div>
+                
+                {/* Player Pawn - centered below name */}
+                <div className={`player-pawn color-${player.color}`}>
+                  ♟
+                </div>
+                
+                {/* Selected Card Display - in dealer button area */}
+                {playerSelectedCard && (
+                  <div className="dealer-button-area">
+                    <div className="selected-card">
+                      <div className={`card-rank ${playerSelectedCard.suit === 'hearts' || playerSelectedCard.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {playerSelectedCard.rank}
+                      </div>
+                      <div className={`card-suit ${playerSelectedCard.suit === 'hearts' || playerSelectedCard.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {playerSelectedCard.suit}
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="card-back">🂠</div>
                 )}
               </div>
-            )) || Array.from({ length: 18 }, (_, i) => (
-              <div key={i} className="dealer-card skeleton">
-                <div className="card-back">🂠</div>
-              </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="dealer-selection-content">
+        {isComplete ? (
+          <div className="dealer-determined">
+            <h3>🏆 Dealer Selected!</h3>
+            <p>
+              <strong>{gameState.players.find(p => p.id === dealerSelection.dealerId)?.name}</strong> is the dealer!
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Turn Indicator */}
+            <div className="turn-indicator">
+              {isCurrentPlayersTurn ? (
+                <div className="your-turn">
+                  <div className="turn-text">🎯 Your Turn</div>
+                  <div className="turn-subtitle">Select a face-down card</div>
+                </div>
+              ) : (
+                <div className="waiting-turn">
+                  ⏳ Waiting for <strong>{gameState.players.find(p => p.id === dealerSelection.currentSelectingPlayerId)?.name}</strong> to select...
+                </div>
+              )}
+            </div>
+            
+            {/* Card Grid - 3 rows of 6 cards (18 total) */}
+            <div className="card-grid">
+              {dealerSelection.dealerCards?.map((card: any, index: number) => (
+                <div
+                  key={card.id || index}
+                  data-card-id={card.id}
+                  className={`dealer-card ${card.isFlipped ? 'flipped' : ''} ${isCurrentPlayersTurn && !card.isFlipped ? 'selectable' : ''}`}
+                  onClick={() => isCurrentPlayersTurn && !card.isFlipped && handleCardClick(card.id)}
+                  tabIndex={isCurrentPlayersTurn && !card.isFlipped ? 0 : -1}
+                  onKeyPress={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isCurrentPlayersTurn && !card.isFlipped) {
+                      e.preventDefault();
+                      handleCardClick(card.id);
+                    }
+                  }}
+                  aria-label={card.isFlipped ? `${card.rank} of ${card.suit}` : `Face-down card ${index + 1}`}
+                >
+                  {card.isFlipped ? (
+                    <div className="card-face">
+                      <div className={`card-rank ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {card.rank}
+                      </div>
+                      <div className={`card-suit ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {card.suit}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="card-back">🂠</div>
+                  )}
+                </div>
+              )) || Array.from({ length: 18 }, (_, i) => (
+                <div key={i} className="dealer-card skeleton">
+                  <div className="card-back">🂠</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

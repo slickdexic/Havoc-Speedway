@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Havoc Speedway Debug Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f5f5f5; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        button { margin: 5px; padding: 10px; }
+        input { margin: 5px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Havoc Speedway Debug Test</h1>
+    
+    <div>
+        <input type="text" id="name1" placeholder="Player 1 Name" value="Host">
+        <button onclick="connect(1)">Connect Player 1</button>
+        <button onclick="createRoom()">Create Room</button>
+    </div>
+    
+    <div>
+        <input type="text" id="name2" placeholder="Player 2 Name" value="Guest">
+        <button onclick="connect(2)">Connect Player 2</button>
+        <button onclick="joinRoom()">Join Room</button>
+    </div>
+    
+    <div>
+        <button onclick="changeSettings()">Change Settings</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="log"></div>
+
+    <script>
+        let ws1, ws2;
+        let roomId = null;
+        
+        function log(message, type = 'log') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log ${type}`;
+            entry.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function connect(playerNum) {
+            const ws = new WebSocket('ws://localhost:3003');
+            const name = document.getElementById(`name${playerNum}`).value;
+            
+            ws.onopen = () => {
+                log(`Player ${playerNum} connected to server`, 'success');
+                
+                // Set name first
+                ws.send(JSON.stringify({
+                    type: 'change_name',
+                    newName: name
+                }));
+            };
+            
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                log(`Player ${playerNum} received: ${message.type}`, 'success');
+                console.log(`Player ${playerNum} full message:`, message);
+                
+                if (message.type === 'room_joined') {
+                    roomId = message.room.id;
+                    log(`Room ID captured: ${roomId}`, 'success');
+                    log(`Players in room: ${JSON.stringify(message.room.players.map(p => p.name))}`, 'success');
+                    log(`Settings: ${JSON.stringify(message.room.settings)}`, 'success');
+                }
+                
+                if (message.type === 'room_updated') {
+                    log(`Room updated - Players: ${JSON.stringify(message.room.players.map(p => p.name))}`, 'success');
+                    log(`Updated Settings: ${JSON.stringify(message.room.settings)}`, 'success');
+                }
+                
+                if (message.type === 'error') {
+                    log(`Error: ${message.error}`, 'error');
+                }
+            };
+            
+            ws.onerror = (error) => {
+                log(`Player ${playerNum} WebSocket error: ${error}`, 'error');
+            };
+            
+            ws.onclose = () => {
+                log(`Player ${playerNum} disconnected`, 'error');
+            };
+            
+            if (playerNum === 1) {
+                ws1 = ws;
+            } else {
+                ws2 = ws;
+            }
+        }
+        
+        function createRoom() {
+            if (!ws1) {
+                log('Player 1 not connected', 'error');
+                return;
+            }
+            
+            ws1.send(JSON.stringify({
+                type: 'create_room',
+                playerName: document.getElementById('name1').value,
+                roomName: 'Debug Test Room',
+                settings: {
+                    numberOfLaps: 3,
+                    numberOfDice: 2,
+                    maxPlayers: 4,
+                    gameSpeed: 'normal',
+                    allowSpectators: false
+                }
+            }));
+            
+            log('Creating room...', 'success');
+        }
+        
+        function joinRoom() {
+            if (!ws2) {
+                log('Player 2 not connected', 'error');
+                return;
+            }
+            
+            if (!roomId) {
+                log('No room ID available', 'error');
+                return;
+            }
+            
+            ws2.send(JSON.stringify({
+                type: 'join_room',
+                playerName: document.getElementById('name2').value,
+                roomId: roomId
+            }));
+            
+            log(`Joining room ${roomId}...`, 'success');
+        }
+        
+        function changeSettings() {
+            if (!ws1) {
+                log('Player 1 not connected', 'error');
+                return;
+            }
+            
+            ws1.send(JSON.stringify({
+                type: 'change_settings',
+                settings: {
+                    numberOfLaps: 5,
+                    numberOfDice: 1,
+                    maxPlayers: 3,
+                    gameSpeed: 'fast',
+                    allowSpectators: true
+                }
+            }));
+            
+            log('Changing settings...', 'success');
+        }
+    </script>
+</body>
+</html>

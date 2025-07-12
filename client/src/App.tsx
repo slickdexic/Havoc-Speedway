@@ -6,16 +6,7 @@ import './styles/game.css'
 import { LobbyNew } from './components/LobbyNew'
 import { Room } from './components/Room'
 import { GameRoom } from './components/GameRoom'
-import type { GameSettings } from '@havoc-speedway/shared';
-
-interface Player {
-  id: string;
-  name: string;
-  color: string;
-  isDealer?: boolean;
-  isHost?: boolean;
-  isConnected?: boolean;
-}
+import type { GameSettings, Player } from '@havoc-speedway/shared';
 
 interface GameState {
   stage: string;
@@ -55,7 +46,26 @@ function App() {
   const [appState, setAppState] = useState<AppState>('lobby');
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(() => {
+    // Try to get name from sessionStorage first (unique per tab)
+    const sessionName = sessionStorage.getItem('havoc-speedway-player-name');
+    if (sessionName) return sessionName;
+    
+    // Try localStorage as fallback
+    const savedName = localStorage.getItem('havoc-speedway-player-name');
+    if (savedName) {
+      // Add random suffix to make it unique for this tab
+      const uniqueName = `${savedName}_${Math.floor(Math.random() * 100)}`;
+      sessionStorage.setItem('havoc-speedway-player-name', uniqueName);
+      return uniqueName;
+    }
+    
+    // Generate completely new name
+    const randomName = `Player${Math.floor(Math.random() * 1000)}`;
+    localStorage.setItem('havoc-speedway-player-name', randomName);
+    sessionStorage.setItem('havoc-speedway-player-name', randomName);
+    return randomName;
+  });
   
   // Lobby state
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
@@ -77,9 +87,12 @@ function App() {
   
   // Connection and setup
   useEffect(() => {
-    // Get stored player name
+    // Get stored player name (prefer session storage for tab uniqueness)
+    const sessionName = sessionStorage.getItem('havoc-speedway-player-name');
     const storedName = localStorage.getItem('havoc-speedway-player-name');
-    if (storedName) {
+    if (sessionName) {
+      setPlayerName(sessionName);
+    } else if (storedName) {
       setPlayerName(storedName);
     }
 
@@ -99,6 +112,15 @@ function App() {
       console.log('Disconnected from server');
       setIsConnected(false);
       setWs(null);
+      
+      // Show connection status to user
+      if (appState !== 'lobby') {
+        alert('Connection lost. You will be returned to the lobby.');
+        setAppState('lobby');
+        setCurrentRoom(null);
+        setGameState(null);
+        setChatMessages([]);
+      }
     };
 
     websocket.onerror = (error) => {
@@ -129,6 +151,7 @@ function App() {
         break;
 
       case 'room_joined':
+        console.log('Joining room:', message);
         // Transition to room state
         setCurrentRoom({
           name: message.room.name,
@@ -142,22 +165,33 @@ function App() {
         break;
 
       case 'room_updated':
-        if (appState === 'room' && currentRoom) {
-          setCurrentRoom({
-            ...currentRoom,
-            players: message.room.players,
-            settings: message.room.settings
-          });
-        }
+        console.log('Room updated:', message);
+        setCurrentRoom(prevRoom => {
+          console.log('Current room before update:', prevRoom);
+          if (prevRoom) {
+            const updatedRoom = {
+              ...prevRoom,
+              players: message.room.players,
+              settings: message.room.settings
+            };
+            console.log('Setting room to:', updatedRoom);
+            return updatedRoom;
+          } else {
+            console.log('No current room - ignoring room_updated');
+            return prevRoom;
+          }
+        });
         break;
 
       case 'game_started':
+        console.log('Game started:', message);
         // Transition to game state
         setGameState(message.gameState);
         setAppState('game');
         break;
 
       case 'game_state_updated':
+        console.log('Game state updated:', message);
         if (appState === 'game') {
           setGameState(message.gameState);
         }
@@ -174,7 +208,15 @@ function App() {
         setChatMessages(prev => [...prev, newMessage]);
         break;
 
+      case 'name_changed':
+        console.log('Name changed:', message);
+        setPlayerName(message.newName);
+        localStorage.setItem('havoc-speedway-player-name', message.newName);
+        sessionStorage.setItem('havoc-speedway-player-name', message.newName);
+        break;
+
       case 'player_left':
+        console.log('Player left:', message);
         if (appState === 'room' && currentRoom) {
           setCurrentRoom({
             ...currentRoom,
@@ -183,16 +225,25 @@ function App() {
         }
         break;
 
+      case 'room_left':
+        console.log('Left room successfully');
+        // Already handled by handleLeaveRoom, just confirm
+        break;
+
       case 'kicked':
+        console.log('Kicked from room');
         // Return to lobby
         setAppState('lobby');
         setCurrentRoom(null);
         setGameState(null);
         setChatMessages([]);
+        alert('You have been kicked from the room.');
         break;
 
       case 'error':
-        console.error('Server error:', message.message);
+        console.error('Server error:', message.error);
+        // Show error to user
+        alert(`Error: ${message.error || 'Unknown error'}`);
         break;
 
       default:
@@ -202,23 +253,31 @@ function App() {
 
   const sendMessage = (message: any) => {
     if (ws && isConnected) {
+      console.log('Sending message:', message);
       ws.send(JSON.stringify(message));
+    } else {
+      console.error('Cannot send message: not connected to server');
+      alert('Not connected to server. Please refresh the page.');
     }
   };
 
   // Lobby handlers
   const handleCreateRoom = (roomName: string) => {
-    if (!playerName.trim()) {
+    let currentPlayerName = playerName;
+    
+    if (!currentPlayerName.trim()) {
       const name = prompt('Please enter your name:');
       if (!name?.trim()) return;
-      setPlayerName(name.trim());
-      localStorage.setItem('havoc-speedway-player-name', name.trim());
+      currentPlayerName = name.trim();
+      setPlayerName(currentPlayerName);
+      localStorage.setItem('havoc-speedway-player-name', currentPlayerName);
+      sessionStorage.setItem('havoc-speedway-player-name', currentPlayerName);
     }
 
     sendMessage({
       type: 'create_room',
       roomName,
-      playerName: playerName,
+      playerName: currentPlayerName,
       isPublic: true,
       settings: {
         numberOfLaps: 3,
@@ -231,22 +290,34 @@ function App() {
   };
 
   const handleJoinRoom = (roomId: string) => {
-    if (!playerName.trim()) {
+    let currentPlayerName = playerName;
+    
+    if (!currentPlayerName.trim()) {
       const name = prompt('Please enter your name:');
       if (!name?.trim()) return;
-      setPlayerName(name.trim());
-      localStorage.setItem('havoc-speedway-player-name', name.trim());
+      currentPlayerName = name.trim();
+      setPlayerName(currentPlayerName);
+      localStorage.setItem('havoc-speedway-player-name', currentPlayerName);
+      sessionStorage.setItem('havoc-speedway-player-name', currentPlayerName);
     }
 
     sendMessage({
       type: 'join_room',
       roomId,
-      playerName: playerName
+      playerName: currentPlayerName
     });
   };
 
   const handleRefreshRooms = () => {
     sendMessage({ type: 'list_rooms' });
+  };
+
+  const handleChangeName = (newName: string) => {
+    if (!newName.trim()) return;
+    sendMessage({ 
+      type: 'change_name', 
+      newName: newName.trim() 
+    });
   };
 
   // Room handlers
@@ -313,6 +384,7 @@ function App() {
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
           onRefreshRooms={handleRefreshRooms}
+          onChangeName={handleChangeName}
         />
       );
 
@@ -334,19 +406,19 @@ function App() {
           onChangeSettings={handleChangeSettings}
           onChangeColor={handleChangeColor}
           onSendMessage={handleSendMessage}
+          onChangeName={handleChangeName}
           chatMessages={chatMessages}
         />
       );
 
     case 'game':
-      if (!gameState) {
+      if (!gameState || !currentRoom) {
         return <div>Loading game...</div>;
       }
 
-      // Get current player info for game
-      const currentPlayer = gameState.players.find(p => p.name === playerName);
-      const isHost = currentPlayer?.isHost || false;
-      const currentPlayerId = currentPlayer?.id || '';
+      // Use the stored current player ID from the room state
+      const currentPlayerId = currentRoom.currentPlayerId;
+      const isHost = currentRoom.isHost;
 
       return (
         <div className="game-app">

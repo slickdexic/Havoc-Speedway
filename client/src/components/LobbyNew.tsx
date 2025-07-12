@@ -16,6 +16,7 @@ interface LobbyProps {
   onJoinRoom: (roomId: string) => void;
   onCreateRoom: (roomName: string) => void;
   onRefreshRooms: () => void;
+  onChangeName: (newName: string) => void;
 }
 
 export function LobbyNew({ 
@@ -24,10 +25,13 @@ export function LobbyNew({
   rooms, 
   onJoinRoom, 
   onCreateRoom, 
-  onRefreshRooms 
+  onRefreshRooms,
+  onChangeName
 }: LobbyProps) {
   const [roomName, setRoomName] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showNameForm, setShowNameForm] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState('');
 
   const handleCreateRoom = () => {
     if (roomName.trim()) {
@@ -39,6 +43,14 @@ export function LobbyNew({
 
   const handleJoinRoom = (roomId: string) => {
     onJoinRoom(roomId);
+  };
+
+  const handleChangeName = () => {
+    if (newPlayerName.trim() && newPlayerName.trim() !== playerName) {
+      onChangeName(newPlayerName.trim());
+      setNewPlayerName('');
+      setShowNameForm(false);
+    }
   };
 
   return (
@@ -56,6 +68,17 @@ export function LobbyNew({
           </div>
           <div className="player-name">
             Welcome, <strong>{playerName}</strong>
+            <button 
+              className="btn btn-ghost btn-small"
+              onClick={() => {
+                setNewPlayerName(playerName);
+                setShowNameForm(true);
+              }}
+              disabled={!isConnected}
+              title="Change your name"
+            >
+              ✏️
+            </button>
           </div>
         </div>
       </header>
@@ -111,6 +134,45 @@ export function LobbyNew({
                   onClick={() => {
                     setShowCreateForm(false);
                     setRoomName('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Change Name Form */}
+        {showNameForm && (
+          <section className="create-room-form">
+            <div className="form-card">
+              <h3>Change Your Name</h3>
+              <div className="form-group">
+                <label htmlFor="newPlayerName">Your Name</label>
+                <input
+                  id="newPlayerName"
+                  type="text"
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  placeholder="Enter your new name..."
+                  maxLength={20}
+                  autoFocus
+                />
+              </div>
+              <div className="form-actions">
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleChangeName}
+                  disabled={!newPlayerName.trim() || newPlayerName.trim() === playerName}
+                >
+                  Change Name
+                </button>
+                <button 
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setShowNameForm(false);
+                    setNewPlayerName('');
                   }}
                 >
                   Cancel

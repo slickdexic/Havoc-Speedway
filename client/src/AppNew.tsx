@@ -6,16 +6,7 @@ import './styles/game.css'
 import { LobbyNew } from './components/LobbyNew'
 import { Room } from './components/Room'
 import { GameRoom } from './components/GameRoom'
-import type { GameSettings } from '@havoc-speedway/shared';
-
-interface Player {
-  id: string;
-  name: string;
-  color: string;
-  isDealer?: boolean;
-  isHost?: boolean;
-  isConnected?: boolean;
-}
+import type { GameSettings, Player } from '@havoc-speedway/shared';
 
 interface GameState {
   stage: string;
@@ -174,6 +165,12 @@ function App() {
         setChatMessages(prev => [...prev, newMessage]);
         break;
 
+      case 'name_changed':
+        console.log('Name changed:', message);
+        setPlayerName(message.newName);
+        localStorage.setItem('havoc-speedway-player-name', message.newName);
+        break;
+
       case 'player_left':
         if (appState === 'room' && currentRoom) {
           setCurrentRoom({
@@ -192,7 +189,8 @@ function App() {
         break;
 
       case 'error':
-        console.error('Server error:', message.message);
+        console.error('Server error:', message.error);
+        alert(`Error: ${message.error || 'Unknown error'}`);
         break;
 
       default:
@@ -247,6 +245,14 @@ function App() {
 
   const handleRefreshRooms = () => {
     sendMessage({ type: 'list_rooms' });
+  };
+
+  const handleChangeName = (newName: string) => {
+    if (!newName.trim()) return;
+    sendMessage({ 
+      type: 'change_name', 
+      newName: newName.trim() 
+    });
   };
 
   // Room handlers
@@ -313,6 +319,7 @@ function App() {
           onJoinRoom={handleJoinRoom}
           onCreateRoom={handleCreateRoom}
           onRefreshRooms={handleRefreshRooms}
+          onChangeName={handleChangeName}
         />
       );
 
@@ -334,6 +341,7 @@ function App() {
           onChangeSettings={handleChangeSettings}
           onChangeColor={handleChangeColor}
           onSendMessage={handleSendMessage}
+          onChangeName={handleChangeName}
           chatMessages={chatMessages}
         />
       );
