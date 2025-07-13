@@ -1,7 +1,7 @@
 // Game Flow and State Management Types
 
-import { Card, StormGameState, DealerSelectionState } from './cards.js';
-import { Lane, Coin, RacingState } from './racing.js';
+import { Card, StormGameState, DealerSelectionState } from './cards';
+import { Lane, Coin, RacingState } from './racing';
 
 export type GameStage = 
   | 'dealer-selection'

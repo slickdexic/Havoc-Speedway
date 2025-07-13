@@ -1,8 +1,8 @@
 // Game Constants
 
-import { Suit, Rank } from '../types/cards.js';
-import { CoinValue } from '../types/racing.js';
-import { PlayerColor } from '../types/game.js';
+import { Suit, Rank } from '../types/cards';
+import { CoinValue } from '../types/racing';
+import { PlayerColor } from '../types/game';
 
 // Card game constants
 export const SUITS: Suit[] = ['hearts', 'diamonds', 'spades', 'clubs'];

@@ -2,7 +2,7 @@
 
 import { GameState, Card, StormGameState, LaneSelectionState, CoinStageState, DealerSelectionState } from '@havoc-speedway/shared';
 import { Lane, Coin, RacingState, PawnState, TrackPosition, CoinValue } from '@havoc-speedway/shared';
-import { CardDeck } from '../CardDeck.js';
+import { CardDeck } from '../CardDeck';
 
 export class StageManager {
   private deck: CardDeck;
@@ -43,7 +43,8 @@ export class StageManager {
       selectedCards: new Map(),
       currentSelectingPlayerId: players[0].id, // First player in seat order
       dealerId: undefined,
-      isComplete: false
+      isComplete: false,
+      tieBreakerPlayers: [] // Initialize tie-breaker array
     };
 
     console.log(`🎴 Dealt 18 cards for dealer selection. First player: ${players[0].name}`);
@@ -641,41 +642,41 @@ export class StageManager {
   }
 
   private isValidPlay(playedCard: Card, topCard: Card, storm: any, calledSuit?: string): boolean {
-    // If toxic 7 is active, can only play 7 or must draw
-    if (storm.toxicSevenActive && playedCard.rank !== '7') {
-      return false;
+    // If toxic 7 is active, the only valid play is another 7.
+    if (storm.toxicSevenActive) {
+      return playedCard.rank === '7';
     }
-    
-    // Queens are wild cards (except when toxic 7 is active)
-    if (playedCard.rank === 'Q' && !storm.toxicSevenActive) {
-      // Must provide called suit when playing Queen
-      if (!calledSuit) {
+
+    // Queens are wild cards (but cannot be played on a toxic 7, handled above)
+    if (playedCard.rank === 'Q') {
+      // Must provide called suit when playing Queen, unless it's the last card
+      if (!calledSuit && storm.playerHands.get(storm.currentPlayerId)?.cards.length > 1) {
         console.log('❌ Must call suit when playing Queen');
         return false;
       }
       return true;
     }
-    
+
     // Determine the effective suit to match
     let targetSuit = topCard.suit;
     if (storm.calledSuit) {
       targetSuit = storm.calledSuit;
     }
-    
+
     // Match rank or suit
     return playedCard.rank === topCard.rank || playedCard.suit === targetSuit;
   }
 
   private handleCardEffects(gameState: GameState, playedCard: Card, calledSuit?: string): void {
     const storm = gameState.storm!;
-    
+
     switch (playedCard.rank) {
       case 'A':
         // Skip next player
         console.log('🃑 Ace played - next player skipped');
         this.skipNextStormPlayer(gameState);
         break;
-        
+
       case 'Q':
         // Set called suit
         if (calledSuit && ['hearts', 'diamonds', 'spades', 'clubs'].includes(calledSuit)) {
@@ -686,7 +687,7 @@ export class StageManager {
           storm.calledSuit = undefined;
         }
         break;
-        
+
       case '7':
         // Handle toxic 7
         if (storm.toxicSevenActive) {
@@ -700,7 +701,7 @@ export class StageManager {
           console.log('💀 Toxic 7 activated - next player must play 7 or draw 2');
         }
         break;
-        
+
       default:
         // Clear called suit for non-Queen cards
         storm.calledSuit = undefined;
@@ -792,8 +793,8 @@ export class StageManager {
 
   private handleCoinAction(gameState: GameState, playerId: string, action: any): boolean {
     console.log('🪙 Handling coin action');
-    
-    const coinStage = (gameState as any).coinStage;
+
+    const coinStage = gameState.coinStage;
     if (!coinStage || action.type !== 'PLACE_COIN') {
       return false;
     }
@@ -805,8 +806,35 @@ export class StageManager {
     }
 
     const { position, lane } = action.position;
+
+    // --- START: Enhanced Coin Placement Validation ---
+
+    // Rule 1: No coins in pit or pit-lane areas (approximated as start/finish line area)
+    if (position >= 93 || position <= 0) { // Position 96 is start line, so 93-96 is restricted.
+        console.log(`❌ Invalid coin placement: Cannot place in the start/finish/pit area (position ${position}).`);
+        // NOTE: Consider sending an error message back to the client.
+        return false;
+    }
+
+    // Rule 2: No coins in 6 spaces directly in front of starting pawns (pos 1-6)
+    const laneSelection = gameState.laneSelection;
+    if (laneSelection) {
+      const occupiedLanes = Array.from(laneSelection.selectedLanes.values());
+      if (position >= 1 && position <= 6 && occupiedLanes.includes(lane)) {
+        console.log(`❌ Invalid coin placement: Cannot place in the first 6 spaces of an occupied lane.`);
+        return false;
+      }
+    }
+
+    // Rule 3: No placing a coin on top of an existing coin.
+    if (coinStage.placedCoins.some(c => c.position === position && c.lane === lane)) {
+        console.log(`❌ Invalid coin placement: A coin already exists at position ${position}, lane ${lane}.`);
+        return false;
+    }
+    // --- END: Enhanced Coin Placement Validation ---
+
     const player = gameState.room.players.get(playerId);
-    
+
     // Get player's available coins
     const playerCoins = coinStage.drawnCoins.get(playerId) || [];
     if (playerCoins.length === 0) {
@@ -870,31 +898,47 @@ export class StageManager {
   }
 
   private handleRollDice(gameState: GameState, playerId: string, diceType: 'standard' | 'lane-change'): boolean {
-    const racing = (gameState as any).racing;
-    const pawn = racing.pawns.get(playerId)!;
-    
-    // Roll the appropriate dice
-    let diceResult: any;
+    const racing = gameState.racing;
+    if (!racing) return false;
+
+    const pawn = racing.pawns[playerId];
+    if (!pawn) return false;
+
+    let diceResultForRollObject: any;
     let movementResult: any;
-    
+    let loggableDiceResult: string;
+
     if (diceType === 'standard') {
-      diceResult = this.rollStandardDie();
-      movementResult = this.calculateStandardMovement(gameState, playerId, diceResult);
-    } else {
-      diceResult = this.rollLaneChangeDie();
-      movementResult = this.calculateLaneChangeMovement(gameState, playerId, diceResult);
+        const isInPit = pawn.currentPosition === 'pit';
+        const numDice = isInPit ? 1 : gameState.room.settings.numberOfDice;
+        
+        const rolls: number[] = [];
+        for (let i = 0; i < numDice; i++) {
+            rolls.push(this.rollStandardDie());
+        }
+        const totalRoll = rolls.reduce((a, b) => a + b, 0);
+
+        diceResultForRollObject = numDice > 1 ? rolls : rolls[0];
+        loggableDiceResult = numDice > 1 ? `${rolls.join(' + ')} = ${totalRoll}` : `${totalRoll}`;
+        
+        movementResult = this.calculateStandardMovement(gameState, playerId, totalRoll);
+    } else { // lane-change
+        const roll = this.rollLaneChangeDie();
+        diceResultForRollObject = roll;
+        loggableDiceResult = roll;
+        movementResult = this.calculateLaneChangeMovement(gameState, playerId, roll);
     }
 
     // Store the dice roll
     const diceRoll = {
       playerId,
       diceType,
-      result: diceResult,
+      result: diceResultForRollObject,
       timestamp: Date.now()
     };
-    
+
     // Store temporary movement state for confirmation
-    (racing as any).pendingMovement = {
+    racing.pendingMovement = {
       playerId,
       diceRoll,
       movementResult,
@@ -902,75 +946,85 @@ export class StageManager {
     };
 
     const player = gameState.room.players.get(playerId);
-    console.log(`🎲 ${player?.name} rolled ${diceType} dice: ${diceResult}`);
-    
+    console.log(`🎲 ${player?.name} rolled ${diceType} dice: ${loggableDiceResult}`);
+
     return true;
   }
 
   private handleConfirmMovement(gameState: GameState, playerId: string): boolean {
-    const racing = (gameState as any).racing;
+    const racing = gameState.racing;
+    if (!racing) return false;
+
     const pendingMovement = racing.pendingMovement;
-    
+
     if (!pendingMovement || pendingMovement.playerId !== playerId) {
       console.log('❌ No pending movement or wrong player');
       return false;
     }
 
     const movementResult = pendingMovement.movementResult;
-    const pawn = racing.pawns.get(playerId)!;
-    
+    const pawn = racing.pawns[playerId];
+    if (!pawn) return false;
+
     // Apply the movement
     pawn.currentPosition = movementResult.newPosition;
     pawn.lane = movementResult.newLane;
     pawn.coordinates = movementResult.newCoordinates;
-    
+    if (movementResult.pitPosition) {
+        pawn.pitPosition = movementResult.pitPosition;
+    }
+
+
     // Handle lap completion
     if (movementResult.lapCompleted) {
       pawn.lapNumber++;
       console.log(`🏃 ${gameState.room.players.get(playerId)?.name} completed lap ${pawn.lapNumber}`);
     }
-    
+
     // Handle coins triggered
     if (movementResult.coinsTriggered.length > 0) {
       for (const coin of movementResult.coinsTriggered) {
         this.handleCoinTrigger(gameState, playerId, coin);
       }
     }
-    
+
     // Check for race finish
     if (movementResult.raceFinished) {
       racing.finishingOrder.push(playerId);
       console.log(`🏆 ${gameState.room.players.get(playerId)?.name} finished the race!`);
-      
+
       // Check if race is complete
       this.checkRaceCompletion(gameState);
     }
 
     // Clear pending movement
     delete racing.pendingMovement;
-    
-    // Advance to next player
+
+    // Advance to the next player
     this.advanceToNextRacingPlayer(gameState);
-    
+
     return true;
   }
 
   private rollStandardDie(): number {
-    return Math.floor(Math.random() * 6) + 1; // 1-6
+    return Math.floor(Math.random() * 6) + 1;
   }
 
-  private rollLaneChangeDie(): string {
-    const faces = ['L1', 'R1', 'check-engine', 'L2', 'R2', 'check-engine'];
-    return faces[Math.floor(Math.random() * 6)];
+  private rollLaneChangeDie(): 'L1' | 'R1' | 'L2' | 'R2' | 'check-engine' {
+    // As per rules, 2 faces are 'check-engine'
+    const outcomes: ('L1' | 'R1' | 'L2' | 'R2' | 'check-engine')[] = [
+        'L1', 'R1', 'L2', 'R2', 'check-engine', 'check-engine'
+    ];
+    return outcomes[Math.floor(Math.random() * outcomes.length)];
   }
 
   private calculateStandardMovement(gameState: GameState, playerId: string, diceResult: number): any {
-    const racing = (gameState as any).racing;
-    const pawn = racing.pawns.get(playerId)!;
+    const pawn = gameState.racing?.pawns[playerId];
+    if (!pawn) return;
+
     const player = gameState.room.players.get(playerId);
-    
     console.log(`🎲 ${player?.name} rolled ${diceResult} on standard die`);
-    
+
     // Handle different pawn locations
     if (pawn.currentPosition === 'pit') {
       return this.handlePitMovement(gameState, playerId, diceResult);
@@ -1050,9 +1104,9 @@ export class StageManager {
     const pawn = racing.pawns.get(playerId)!;
     const player = gameState.room.players.get(playerId);
     const currentPitPosition = pawn.pitPosition || 1;
-    
+
     const newPitPosition = currentPitPosition + diceResult;
-    
+
     // Check if hitting pit-lane wall (position > 5)
     if (newPitPosition > 5) {
       console.log(`💥 ${player?.name} hits pit-lane wall, sent back to pit`);
@@ -1070,10 +1124,10 @@ export class StageManager {
         }
       };
     }
-    
+
     // Stay in pit-lane
     console.log(`🚗 ${player?.name} moves to pit-lane space ${newPitPosition}`);
-    
+
     return {
       success: true,
       newPosition: 'pit-lane',
@@ -1087,38 +1141,53 @@ export class StageManager {
   }
 
   private handleTrackMovement(gameState: GameState, playerId: string, moveSpaces: number): any {
-    const racing = (gameState as any).racing;
-    const pawn = racing.pawns.get(playerId)!;
+    const racing = gameState.racing;
+    if (!racing) return;
+    const pawn = racing.pawns[playerId];
+    if (!pawn) return;
     const player = gameState.room.players.get(playerId);
-    
-    let newPosition = pawn.currentPosition;
+
+    const currentPos = pawn.currentPosition as number;
+    let finalPosition = currentPos;
+    let obstructionInfo: any = null;
     let lapCompleted = false;
+
+    // Check each space one by one for obstructions
+    for (let i = 1; i <= moveSpaces; i++) {
+        let nextPos = (finalPosition % 96) + 1;
+
+        // Check for lap completion
+        if (finalPosition === 96 && nextPos === 1) {
+            lapCompleted = true;
+        }
+
+        // Check for another pawn in the next space
+        const obstructingPawn = Object.values(racing.pawns).find(
+            (p: PawnState) => p.playerId !== playerId && p.currentPosition === nextPos && p.lane === pawn.lane
+        );
+
+        if (obstructingPawn) {
+            console.log(`🚧 Movement for ${player?.name} obstructed at position ${nextPos} by ${gameState.room.players.get(obstructingPawn!.playerId)?.name}`);
+            obstructionInfo = {
+                blockedBy: 'pawn',
+                finalPosition: finalPosition,
+                finalLane: pawn.lane
+            };
+            break; // Stop movement
+        }
+        finalPosition = nextPos; // Move to the next space
+    }
+
+    const newPosition = finalPosition;
     let raceFinished = false;
-    
-    // Calculate new position
-    newPosition = (pawn.currentPosition + moveSpaces) % 96;
-    if (newPosition === 0) newPosition = 96;
-    
-    // Check for lap completion (crossing position 96)
-    if (pawn.currentPosition + moveSpaces > 96) {
-      lapCompleted = true;
-      
-      // Check for race finish
-      if (pawn.lapNumber + 1 >= racing.lapTarget) {
+
+    // Check for race finish
+    if (lapCompleted && (pawn.lapNumber + 1 >= racing.lapTarget)) {
         raceFinished = true;
-      }
     }
     
-    // Check for obstructions
-    const obstruction = this.checkObstruction(gameState, newPosition, pawn.lane);
-    if (obstruction) {
-      newPosition = obstruction.finalPosition;
-    }
-    
-    // Check for coins at new position
     const coinsTriggered = this.getCoinsAtPosition(gameState, newPosition, pawn.lane);
-    
-    const newCoordinates = this.getTrackCoordinates(newPosition, pawn.lane);
+    const newCoordinates = this.getTrackCoordinates(newPosition as TrackPosition, pawn.lane);
     
     console.log(`🏎️ ${player?.name} moves to position ${newPosition}, lane ${pawn.lane}`);
     
@@ -1130,28 +1199,34 @@ export class StageManager {
       coinsTriggered,
       lapCompleted,
       raceFinished,
-      obstruction
+      obstruction: obstructionInfo
     };
   }
 
   private handleLaneChange(gameState: GameState, playerId: string, diceResult: string): any {
-    const racing = (gameState as any).racing;
-    const pawn = racing.pawns.get(playerId)!;
+    const racing = gameState.racing;
+    if (!racing) return;
+    const pawn = racing.pawns[playerId];
+    if (!pawn) return;
     const player = gameState.room.players.get(playerId);
-    
+
     // Special handling for pit-lane
     if (pawn.currentPosition === 'pit-lane') {
       if (diceResult === 'R1' || diceResult === 'R2') {
         // Can merge back onto track
         const newLane = pawn.lane;
         const newPosition = 1; // Re-enter at position 1
-        
+
         // Check for obstruction at re-entry point
-        const obstruction = this.checkObstruction(gameState, newPosition, newLane);
-        if (obstruction) {
-          console.log(`❌ ${player?.name} cannot merge - track obstructed`);
+        const isObstructed = Object.values(racing.pawns).some(
+            (p: PawnState) => p.playerId !== playerId && p.currentPosition === newPosition && p.lane === newLane
+        );
+
+        if (isObstructed) {
+          console.log(`❌ ${player?.name} cannot merge - track obstructed. Turn ends.`);
           return {
             success: false,
+            reason: 'MERGE_BLOCKED',
             newPosition: pawn.currentPosition,
             newLane: pawn.lane,
             newCoordinates: pawn.coordinates,
@@ -1160,7 +1235,7 @@ export class StageManager {
             raceFinished: false
           };
         }
-        
+
         console.log(`🚗 ${player?.name} merges back onto track`);
         return {
           success: true,
@@ -1172,9 +1247,10 @@ export class StageManager {
           raceFinished: false
         };
       } else {
-        console.log(`❌ ${player?.name} cannot merge with ${diceResult}`);
+        console.log(`❌ ${player?.name} cannot merge with ${diceResult}. Turn ends.`);
         return {
           success: false,
+          reason: 'INVALID_MERGE_ROLL',
           newPosition: pawn.currentPosition,
           newLane: pawn.lane,
           newCoordinates: pawn.coordinates,
@@ -1184,90 +1260,69 @@ export class StageManager {
         };
       }
     }
-    
+
     // Regular lane change on track
-    let laneChange = 0;
-    if (diceResult === 'L1') laneChange = -1;
-    else if (diceResult === 'R1') laneChange = 1;
-    else if (diceResult === 'L2') laneChange = -2;
-    else if (diceResult === 'R2') laneChange = 2;
-    
-    const newLane = Math.max(1, Math.min(4, pawn.lane + laneChange)) as Lane;
-    const actualLaneChange = newLane - pawn.lane;
-    
-    if (actualLaneChange === 0) {
-      console.log(`❌ ${player?.name} cannot change lanes (blocked by wall)`);
-      return {
-        success: false,
-        newPosition: pawn.currentPosition,
-        newLane: pawn.lane,
-        newCoordinates: pawn.coordinates,
-        coinsTriggered: [],
-        lapCompleted: false,
-        raceFinished: false
-      };
+    let desiredLaneChange = 0;
+    if (diceResult === 'L1') desiredLaneChange = -1;
+    else if (diceResult === 'R1') desiredLaneChange = 1;
+    else if (diceResult === 'L2') desiredLaneChange = -2;
+    else if (diceResult === 'R2') desiredLaneChange = 2;
+
+    let finalLane = pawn.lane;
+    let obstructionInfo = null;
+
+    // Try to move the maximum amount, then less if blocked
+    for (let i = Math.abs(desiredLaneChange); i > 0; i--) {
+        const tryLane = (pawn.lane + (i * Math.sign(desiredLaneChange))) as Lane;
+
+        if (tryLane < 1 || tryLane > 4) {
+            obstructionInfo = { blockedBy: 'wall' };
+            continue; // Hit a wall
+        }
+
+        const isObstructed = Object.values(racing.pawns).some(
+            (p: PawnState) => p.playerId !== playerId && p.currentPosition === pawn.currentPosition && p.lane === tryLane
+        );
+
+        if (!isObstructed) {
+            finalLane = tryLane;
+            obstructionInfo = null; // Found a clear path
+            break; // Found a valid lane
+        } else {
+            obstructionInfo = { blockedBy: 'pawn' };
+        }
     }
-    
-    // Check for pawn obstruction
-    const obstruction = this.checkObstruction(gameState, pawn.currentPosition, newLane);
-    const finalLane = obstruction ? obstruction.finalLane || pawn.lane : newLane;
-    
-    console.log(`🚗 ${player?.name} changes from lane ${pawn.lane} to lane ${finalLane}`);
-    
+
+    if (finalLane === pawn.lane) {
+      console.log(`❌ ${player?.name} cannot change lanes (blocked)`);
+    } else {
+      console.log(`🚗 ${player?.name} changes from lane ${pawn.lane} to lane ${finalLane}`);
+    }
+
     return {
       success: true,
       newPosition: pawn.currentPosition,
       newLane: finalLane,
-      newCoordinates: this.getTrackCoordinates(pawn.currentPosition, finalLane),
-      coinsTriggered: this.getCoinsAtPosition(gameState, pawn.currentPosition, finalLane),
+      newCoordinates: this.getTrackCoordinates(pawn.currentPosition as TrackPosition, finalLane),
+      coinsTriggered: this.getCoinsAtPosition(gameState, pawn.currentPosition as number, finalLane),
       lapCompleted: false,
       raceFinished: false,
-      obstruction
+      obstruction: obstructionInfo
     };
   }
 
-  private checkObstruction(gameState: GameState, position: number, lane: Lane): any {
-    const racing = (gameState as any).racing;
-    
-    // Check for other pawns at this position/lane
-    for (const [otherPlayerId, otherPawn] of racing.pawns.entries()) {
-      if (otherPawn.currentPosition === position && otherPawn.lane === lane) {
-        console.log(`🚧 Position ${position}, lane ${lane} obstructed by ${gameState.room.players.get(otherPlayerId)?.name}`);
-        
-        // Find the last available position before obstruction
-        let fallbackPosition = position;
-        for (let checkPos = position - 1; checkPos > 0; checkPos--) {
-          const hasObstruction = Array.from(racing.pawns.values())
-            .some((p: any) => p.currentPosition === checkPos && p.lane === lane);
-          
-          if (!hasObstruction) {
-            fallbackPosition = checkPos;
-            break;
-          }
-        }
-        
-        return {
-          blockedBy: 'pawn',
-          finalPosition: fallbackPosition,
-          finalLane: lane
-        };
-      }
-    }
-    
-    return null;
-  }
-
   private getCoinsAtPosition(gameState: GameState, position: number, lane: Lane): any[] {
-    const racing = (gameState as any).racing;
+    const racing = gameState.racing;
+    if (!racing) return [];
     const triggeredCoins = [];
-    
-    for (const [coinId, coin] of racing.coins.entries()) {
+
+    for (const [coinId, coin] of Object.entries(racing.coins)) {
       if (coin.position === position && coin.lane === lane && !coin.isRevealed) {
         coin.isRevealed = true;
         triggeredCoins.push(coin);
       }
     }
-    
+
     return triggeredCoins;
   }
 
@@ -1368,8 +1423,9 @@ export class StageManager {
   }
 
   private advanceToNextRacingPlayer(gameState: GameState): void {
-    const racing = (gameState as any).racing;
-    
+    const racing = gameState.racing;
+    if (!racing) return;
+
     if (racing.raceFinished) {
       return; // No more turns after race is finished
     }
@@ -1386,28 +1442,34 @@ export class StageManager {
 
   // Helper methods for stage advancement
   private advanceToNextSelector(gameState: GameState): void {
-    const dealerSelection = (gameState as any).dealerSelection;
+    const dealerSelection = gameState.dealerSelection;
     if (!dealerSelection) return;
 
-    const players = Array.from(gameState.room.players.values())
-      .sort((a, b) => a.roomSlot - b.roomSlot);
-    
-    const currentIndex = players.findIndex(p => p.id === dealerSelection.currentSelectingPlayerId);
-    
+    const playersInSeatOrder = Array.from(gameState.room.players.values()).sort(
+      (a, b) => a.roomSlot - b.roomSlot
+    );
+
+    const playersToSelect =
+      dealerSelection.tieBreakerPlayers && dealerSelection.tieBreakerPlayers.length > 0
+        ? playersInSeatOrder.filter((p) => dealerSelection.tieBreakerPlayers?.includes(p.id))
+        : playersInSeatOrder;
+
+    const currentIndex = playersToSelect.findIndex((p) => p.id === dealerSelection.currentSelectingPlayerId);
+
     // Find next player who hasn't selected a card yet
-    for (let i = 1; i <= players.length; i++) {
-      const nextIndex = (currentIndex + i) % players.length;
-      const nextPlayer = players[nextIndex];
-      
+    for (let i = 1; i <= playersToSelect.length; i++) {
+      const nextIndex = (currentIndex + i) % playersToSelect.length;
+      const nextPlayer = playersToSelect[nextIndex];
+
       if (!dealerSelection.selectedCards.has(nextPlayer.id)) {
         dealerSelection.currentSelectingPlayerId = nextPlayer.id;
         console.log(`📍 Next player to select: ${nextPlayer.name}`);
         return;
       }
     }
-    
-    // All players have selected cards
-    console.log('✅ All players have selected cards');
+
+    // All players (in the current round) have selected cards
+    console.log('✅ All players in the current selection round have selected cards');
   }
 
   private advanceToNextLaneSelector(gameState: GameState): void {
@@ -1462,34 +1524,48 @@ export class StageManager {
   }
 
   private checkDealerSelectionResult(gameState: GameState): void {
-    const dealerSelection = (gameState as any).dealerSelection;
+    const dealerSelection = gameState.dealerSelection;
     if (!dealerSelection) {
       console.error('No dealer selection state found');
       return;
     }
 
+    const playersToConsider =
+      dealerSelection.tieBreakerPlayers && dealerSelection.tieBreakerPlayers.length > 0
+        ? dealerSelection.tieBreakerPlayers
+        : Array.from(gameState.room.players.keys());
+
     const selectedCards = dealerSelection.selectedCards;
-    const totalPlayers = gameState.room.players.size;
-    
-    // Wait until all players have selected cards
-    if (selectedCards.size < totalPlayers) {
-      console.log(`⏳ Waiting for more players to select cards (${selectedCards.size}/${totalPlayers})`);
+
+    // Wait until all players who need to select have done so.
+    const allPlayersSelected = playersToConsider.every((playerId) => selectedCards.has(playerId));
+    if (!allPlayersSelected) {
+      const selectedCount = playersToConsider.filter((p) => selectedCards.has(p)).length;
+      console.log(`⏳ Waiting for more players to select cards (${selectedCount}/${playersToConsider.length})`);
       return;
     }
 
-    const playerCards: Array<{playerId: string, card: Card, value: number}> = [];
+    const playerCards: Array<{ playerId: string; card: Card; value: number }> = [];
 
-    // Get card values for all players
-    for (const [playerId, card] of selectedCards.entries()) {
-      const value = CardDeck.getCardValue(card);
-      playerCards.push({ playerId, card, value });
+    // Get card values for all players who are part of the current selection round
+    for (const playerId of playersToConsider) {
+      const card = selectedCards.get(playerId);
+      if (card) {
+        const value = CardDeck.getCardValue(card);
+        playerCards.push({ playerId, card, value });
+      }
     }
 
     // Sort by card value (LOWEST first for dealer selection)
     playerCards.sort((a, b) => a.value - b.value);
 
+    if (playerCards.length === 0) {
+      console.log('No cards to compare for dealer selection.');
+      return;
+    }
+
     const lowestValue = playerCards[0]?.value;
-    const tiedPlayers = playerCards.filter(pc => pc.value === lowestValue);
+    const tiedPlayers = playerCards.filter((pc) => pc.value === lowestValue);
 
     if (tiedPlayers.length === 1) {
       // Clear winner (lowest card)
@@ -1497,22 +1573,33 @@ export class StageManager {
       dealerSelection.dealerId = dealerId;
       gameState.dealerButton = dealerId; // Also set the cross-stage dealer button
       dealerSelection.isComplete = true;
-      
+      dealerSelection.tieBreakerPlayers = []; // Clear any previous tie-breaker state
+
       const dealer = gameState.room.players.get(dealerId);
-      console.log(`🏆 Dealer determined: ${dealer?.name} with ${tiedPlayers[0].card.rank} of ${tiedPlayers[0].card.suit} (lowest card)`);
+      console.log(
+        `🏆 Dealer determined: ${dealer?.name} with ${tiedPlayers[0].card.rank} of ${tiedPlayers[0].card.suit} (lowest card)`
+      );
     } else {
       // Handle tie - need another round
+      const tiedPlayerIds = tiedPlayers.map((p) => p.playerId);
+      dealerSelection.tieBreakerPlayers = tiedPlayerIds;
       console.log(`🔄 Tie detected between ${tiedPlayers.length} players - dealing again`);
-      this.handleDealerSelectionTie(gameState, tiedPlayers);
+      this.handleDealerSelectionTie(gameState);
     }
   }
 
-  private handleDealerSelectionTie(gameState: GameState, tiedPlayers: Array<{playerId: string, card: Card, value: number}>): void {
-    const dealerSelection = (gameState as any).dealerSelection;
+  private handleDealerSelectionTie(gameState: GameState): void {
+    const dealerSelection = gameState.dealerSelection;
     if (!dealerSelection) return;
 
+    const tiedPlayerIds = dealerSelection.tieBreakerPlayers;
+    if (!tiedPlayerIds || tiedPlayerIds.length === 0) {
+      console.error('handleDealerSelectionTie called without any tied players.');
+      return;
+    }
+
     console.log('🎴 Breaking tie between players...');
-    
+
     // Reset the grid with new 18 cards
     const newDealerCards = this.deck.dealDealerSelectionCards();
     newDealerCards.forEach((card, index) => {
@@ -1522,24 +1609,26 @@ export class StageManager {
       (card as any).isFlipped = false;
     });
 
-    // Keep existing cards for non-tied players, clear for tied players
-    const newSelectedCards = new Map<string, Card>();
-    for (const [playerId, card] of dealerSelection.selectedCards.entries()) {
-      const isTied = tiedPlayers.some(tp => tp.playerId === playerId);
-      if (!isTied) {
-        newSelectedCards.set(playerId, card);
-      }
+    // Clear selected cards for tied players so they can select again
+    for (const playerId of tiedPlayerIds) {
+      dealerSelection.selectedCards.delete(playerId);
     }
 
     // Update state for new selection round
     dealerSelection.dealerCards = newDealerCards;
-    dealerSelection.selectedCards = newSelectedCards;
-    
-    // Set first tied player as current selector
-    if (tiedPlayers.length > 0) {
-      dealerSelection.currentSelectingPlayerId = tiedPlayers[0].playerId;
-      const firstTiedPlayer = gameState.room.players.get(tiedPlayers[0].playerId);
-      console.log(`🔄 Tie-breaking round starts with: ${firstTiedPlayer?.name}`);
+
+    // Set first tied player as current selector (in seat order)
+    const players = Array.from(gameState.room.players.values()).sort((a, b) => a.roomSlot - b.roomSlot);
+
+    const firstTiedPlayer = players.find((p) => tiedPlayerIds.includes(p.id));
+
+    if (firstTiedPlayer) {
+      dealerSelection.currentSelectingPlayerId = firstTiedPlayer.id;
+      console.log(`🔄 Tie-breaking round starts with: ${firstTiedPlayer.name}`);
+    } else {
+      console.error('Could not find a valid player to start the tie-break round.');
+      // As a fallback, pick the first from the list.
+      dealerSelection.currentSelectingPlayerId = tiedPlayerIds[0];
     }
   }
 

@@ -71,6 +71,7 @@ export interface MovementResult {
   coinsTriggered: Coin[];
   lapCompleted: boolean;
   raceFinished: boolean;
+  pitPosition?: number;
   obstruction?: {
     blockedBy: 'wall' | 'pawn';
     finalPosition: TrackPosition | 'pit' | 'pit-lane';
@@ -78,10 +79,18 @@ export interface MovementResult {
 }
 
 export interface RacingState {
-  pawns: Map<string, PawnState>;
-  coins: Map<string, Coin>; // keyed by coin.id
+  pawns: Record<string, PawnState>;
+  coins: Record<string, Coin>; // keyed by coin.id
   currentRacingPlayer: string;
   raceFinished: boolean;
   finishingOrder: string[]; // playerIds in finishing order
   lapTarget: number; // configured by host (1-5)
+  pendingMovement?: {
+    playerId: string;
+    diceRoll: DiceRoll;
+    movementResult: MovementResult;
+    confirmed: boolean;
+  };
+  // Add pit positions mapping for tracking pit assignments
+  pitPositions?: Record<string, number>; // playerId -> pitNumber
 }

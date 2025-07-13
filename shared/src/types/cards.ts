@@ -19,10 +19,12 @@ export interface CardDeck {
 // Dealer selection state
 export interface DealerSelectionState {
   dealerCards: Card[]; // 18 face-down cards in 3x6 grid
-  selectedCards: Map<string, Card>; // playerId -> selected card
+  selectedCards: Record<string, Card>; // playerId -> selected card
   currentSelectingPlayerId: string;
   dealerId?: string;
   isComplete: boolean;
+  tieBreakerPlayers?: string[]; // Players involved in a tie-breaker
+  currentRound?: number; // Track rounds for multi-round ties
 }
 
 // Special card effects

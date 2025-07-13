@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@havoc-speedway/shared": ["shared/src/index.ts"],
+      "@havoc-speedway/shared/*": ["shared/src/*"]
+    }
+  },
+  "references": [
+    { "path": "shared" },
+    { "path": "server" },
+    { "path": "client" }
+  ]
+}
