@@ -1,7 +1,7 @@
 // Player Action Types
 
-import { Lane, TrackPosition } from './racing.js';
-import { Suit } from './cards.js';
+import { Lane, TrackPosition } from './racing';
+import { Suit } from './cards';
 
 export type PlayerAction =
   | SelectDealerCardAction

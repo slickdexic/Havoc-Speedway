@@ -2,7 +2,7 @@
 
 import { GameState, Card, StormGameState, LaneSelectionState, CoinStageState, DealerSelectionState } from '@havoc-speedway/shared';
 import { Lane, Coin, RacingState, PawnState, TrackPosition, CoinValue } from '@havoc-speedway/shared';
-import { CardDeck } from '../CardDeck';
+import { CardDeck } from '../CardDeck.js';
 
 export class StageManager {
   private deck: CardDeck;
@@ -40,7 +40,7 @@ export class StageManager {
     // Create dealer selection state
     (gameState as any).dealerSelection = {
       dealerCards,
-      selectedCards: new Map(),
+      selectedCards: {},
       currentSelectingPlayerId: players[0].id, // First player in seat order
       dealerId: undefined,
       isComplete: false,
@@ -493,7 +493,7 @@ export class StageManager {
 
       // Flip the card and assign it to the player
       selectedCard.isFlipped = true;
-      dealerSelection.selectedCards.set(playerId, selectedCard);
+      dealerSelection.selectedCards[playerId] = selectedCard;
       
       const player = gameState.room.players.get(playerId);
       console.log(`🎴 ${player?.name} selected ${selectedCard.rank} of ${selectedCard.suit}`);
@@ -1461,7 +1461,7 @@ export class StageManager {
       const nextIndex = (currentIndex + i) % playersToSelect.length;
       const nextPlayer = playersToSelect[nextIndex];
 
-      if (!dealerSelection.selectedCards.has(nextPlayer.id)) {
+      if (!(nextPlayer.id in dealerSelection.selectedCards)) {
         dealerSelection.currentSelectingPlayerId = nextPlayer.id;
         console.log(`📍 Next player to select: ${nextPlayer.name}`);
         return;
@@ -1538,9 +1538,9 @@ export class StageManager {
     const selectedCards = dealerSelection.selectedCards;
 
     // Wait until all players who need to select have done so.
-    const allPlayersSelected = playersToConsider.every((playerId) => selectedCards.has(playerId));
+    const allPlayersSelected = playersToConsider.every((playerId) => playerId in selectedCards);
     if (!allPlayersSelected) {
-      const selectedCount = playersToConsider.filter((p) => selectedCards.has(p)).length;
+      const selectedCount = playersToConsider.filter((p) => p in selectedCards).length;
       console.log(`⏳ Waiting for more players to select cards (${selectedCount}/${playersToConsider.length})`);
       return;
     }
@@ -1549,7 +1549,7 @@ export class StageManager {
 
     // Get card values for all players who are part of the current selection round
     for (const playerId of playersToConsider) {
-      const card = selectedCards.get(playerId);
+      const card = selectedCards[playerId];
       if (card) {
         const value = CardDeck.getCardValue(card);
         playerCards.push({ playerId, card, value });
@@ -1611,7 +1611,7 @@ export class StageManager {
 
     // Clear selected cards for tied players so they can select again
     for (const playerId of tiedPlayerIds) {
-      dealerSelection.selectedCards.delete(playerId);
+      delete dealerSelection.selectedCards[playerId];
     }
 
     // Update state for new selection round

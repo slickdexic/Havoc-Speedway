@@ -39,9 +39,10 @@ export function Room({
   chatMessages
 }: RoomProps) {
   const [message, setMessage] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
   const [showNameChange, setShowNameChange] = useState(false);
   const [newName, setNewName] = useState('');
+  const [privateMessage, setPrivateMessage] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
 
   // Debug logging
   console.log('Room component render - players:', players.map(p => `${p.name} (${p.id.slice(0,8)})`));
@@ -56,6 +57,14 @@ export function Room({
     if (message.trim()) {
       onSendMessage(message.trim(), false);
       setMessage('');
+    }
+  };
+
+  const handleSendPrivateMessage = () => {
+    if (privateMessage.trim() && selectedPlayer) {
+      onSendMessage(privateMessage.trim(), true, selectedPlayer);
+      setPrivateMessage('');
+      setSelectedPlayer('');
     }
   };
 
@@ -84,14 +93,6 @@ export function Room({
           </div>
         </div>
         <div className="room-controls">
-          {isHost && (
-            <button 
-              className="btn btn-secondary"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              ⚙️ Game Settings
-            </button>
-          )}
           <button 
             className="btn btn-danger"
             onClick={onLeaveRoom}
@@ -102,14 +103,14 @@ export function Room({
       </header>
 
       <div className="room-content">
-        {/* Settings Panel */}
-        {showSettings && isHost && (
-          <section className="settings-panel">
-            <div className="settings-card">
-              <h3>🎮 Game Configuration</h3>
-              <div className="settings-grid">
-                <div className="setting-group">
-                  <label>Race Length</label>
+        {/* Game Settings - Always Visible */}
+        <section className="settings-panel">
+          <div className="settings-card">
+            <h3>🎮 Game Rules {!isHost && <span className="readonly-indicator">(Host Controls)</span>}</h3>
+            <div className="settings-grid">
+              <div className="setting-group">
+                <label>🏁 Race Length</label>
+                {isHost ? (
                   <select 
                     value={settings.numberOfLaps}
                     onChange={(e) => onChangeSettings({
@@ -121,10 +122,14 @@ export function Room({
                       <option key={n} value={n}>{n} Lap{n > 1 ? 's' : ''}</option>
                     ))}
                   </select>
-                </div>
-                
-                <div className="setting-group">
-                  <label>Movement Dice</label>
+                ) : (
+                  <div className="setting-value">{settings.numberOfLaps} Lap{settings.numberOfLaps > 1 ? 's' : ''}</div>
+                )}
+              </div>
+              
+              <div className="setting-group">
+                <label>🎲 Movement Dice</label>
+                {isHost ? (
                   <select 
                     value={settings.numberOfDice}
                     onChange={(e) => onChangeSettings({
@@ -135,10 +140,14 @@ export function Room({
                     <option value={1}>1 Die</option>
                     <option value={2}>2 Dice</option>
                   </select>
-                </div>
-                
-                <div className="setting-group">
-                  <label>Card Decks</label>
+                ) : (
+                  <div className="setting-value">{settings.numberOfDice} {settings.numberOfDice === 1 ? 'Die' : 'Dice'}</div>
+                )}
+              </div>
+              
+              <div className="setting-group">
+                <label>🃏 Card Decks</label>
+                {isHost ? (
                   <select 
                     value={settings.numberOfDecks}
                     onChange={(e) => onChangeSettings({
@@ -149,10 +158,14 @@ export function Room({
                     <option value={1}>Single Deck (32 cards)</option>
                     <option value={2}>Double Deck (64 cards)</option>
                   </select>
-                </div>
+                ) : (
+                  <div className="setting-value">{settings.numberOfDecks === 1 ? 'Single Deck (32 cards)' : 'Double Deck (64 cards)'}</div>
+                )}
+              </div>
 
-                <div className="setting-group">
-                  <label>Starting Hand</label>
+              <div className="setting-group">
+                <label>🎴 Starting Hand</label>
+                {isHost ? (
                   <select 
                     value={settings.cardsPerHand}
                     onChange={(e) => onChangeSettings({
@@ -164,10 +177,14 @@ export function Room({
                       <option key={n} value={n}>{n} Cards</option>
                     ))}
                   </select>
-                </div>
+                ) : (
+                  <div className="setting-value">{settings.cardsPerHand} Cards</div>
+                )}
+              </div>
 
-                <div className="setting-group">
-                  <label>Coins per Player</label>
+              <div className="setting-group">
+                <label>🪙 Coins per Player</label>
+                {isHost ? (
                   <select 
                     value={settings.numberOfCoins}
                     onChange={(e) => onChangeSettings({
@@ -179,11 +196,13 @@ export function Room({
                       <option key={n} value={n}>{n} Coin{n > 1 ? 's' : ''}</option>
                     ))}
                   </select>
-                </div>
+                ) : (
+                  <div className="setting-value">{settings.numberOfCoins} Coin{settings.numberOfCoins > 1 ? 's' : ''}</div>
+                )}
               </div>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         <div className="room-main">
           {/* Players Section */}
@@ -279,6 +298,16 @@ export function Room({
                             </>
                           )}
                           
+                          {player.id !== currentPlayerId && (
+                            <button 
+                              className="btn btn-secondary btn-small"
+                              onClick={() => setSelectedPlayer(player.id)}
+                              title={`Send private message to ${player.name}`}
+                            >
+                              💬 Message
+                            </button>
+                          )}
+                          
                           {isHost && player.id !== currentPlayerId && (
                             <button 
                               className="btn btn-danger btn-small"
@@ -338,6 +367,51 @@ export function Room({
             </div>
           </section>
         </div>
+
+        {/* Private Message Modal */}
+        {selectedPlayer && (
+          <div className="private-message-overlay">
+            <div className="private-message-modal">
+              <div className="modal-header">
+                <h4>Send Private Message to {players.find(p => p.id === selectedPlayer)?.name}</h4>
+                <button 
+                  className="btn btn-ghost"
+                  onClick={() => setSelectedPlayer('')}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <textarea
+                  value={privateMessage}
+                  onChange={(e) => setPrivateMessage(e.target.value)}
+                  placeholder="Type your private message..."
+                  maxLength={200}
+                  rows={3}
+                  autoFocus
+                />
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="btn btn-primary"
+                  onClick={handleSendPrivateMessage}
+                  disabled={!privateMessage.trim()}
+                >
+                  Send Private Message
+                </button>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSelectedPlayer('');
+                    setPrivateMessage('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Start Game Section */}
         <section className="start-game-section">
