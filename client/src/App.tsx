@@ -6,7 +6,8 @@ import './styles/game.css'
 import { LobbyNew } from './components/LobbyNew'
 import { Room } from './components/Room'
 import GameRoom from './components/GameRoom'
-import type { GameSettings, Player, ClientGameState } from '@havoc-speedway/shared';
+import type { GameSettings, Player } from '../../shared/src/types/game';
+import type { ClientGameState } from '../../shared/src/types/client';
 
 interface RoomInfo {
   id: string;
@@ -353,6 +354,15 @@ function App() {
     });
   };
 
+  const handleSendPrivateMessage = (targetPlayerId: string, message: string) => {
+    sendMessage({ 
+      type: 'send_message', 
+      content: message,
+      isPrivate: true,
+      targetPlayerId
+    });
+  };
+
   const handlePlayerAction = (action: any) => {
     sendMessage({
       type: 'player_action',
@@ -403,9 +413,13 @@ function App() {
         return <div>Loading game...</div>;
       }
 
-      // Use the stored current player ID from the room state
+      // Find the current player object from the game state
       const currentPlayerId = currentRoom.currentPlayerId;
-      const isHost = currentRoom.isHost;
+      const currentPlayer = gameState.players.find(p => p.id === currentPlayerId);
+      
+      if (!currentPlayer) {
+        return <div>Error: Current player not found in game state</div>;
+      }
 
       return (
         <div className="game-app">
@@ -435,16 +449,19 @@ function App() {
           <div className="game-content">
             <GameRoom
               gameState={gameState}
-              currentPlayerId={currentPlayerId}
-              isHost={isHost}
-              onLeaveRoom={handleLeaveRoom}
-              onStartGame={handleStartGame}
-              onKickPlayer={handleKickPlayer}
-              onChangeSettings={handleChangeSettings}
+              currentPlayer={currentPlayer}
+              onGameAction={handlePlayerAction}
               onSendMessage={handleSendMessage}
-              onChangeColor={handleChangeColor}
-              onPlayerAction={handlePlayerAction}
-              chatMessages={chatMessages}
+              onSendPrivateMessage={handleSendPrivateMessage}
+              players={gameState.players}
+              messages={chatMessages.map(msg => ({
+                id: msg.id,
+                playerId: msg.sender, // Transform sender to playerId
+                playerName: msg.sender, // For now, use sender as playerName (should be looked up from players)
+                message: msg.content, // Transform content to message
+                timestamp: msg.timestamp,
+                isPrivate: msg.isPrivate
+              }))}
             />
           </div>
         </div>

@@ -72,8 +72,9 @@ export class GameServer {
     }
 
     // Assign next available slot
-    const usedSlots = Array.from(gameState.room.players.values()).map(p => p.roomSlot);
-    const availableSlot = [2, 3, 4].find(slot => !usedSlots.includes(slot as any)) as 1 | 2 | 3 | 4;
+    const usedSlots = Array.from(gameState.room.players.values()).map((p: Player) => p.roomSlot);
+    const availableSlots = [2, 3, 4] as const;
+    const availableSlot = availableSlots.find(slot => !usedSlots.includes(slot));
     
     if (!availableSlot) {
       console.log(`❌ No available slots in room: ${roomId}`);
@@ -103,7 +104,7 @@ export class GameServer {
       
       // If host left and there are other players, assign new host
       if (gameState.room.hostId === playerId && gameState.room.players.size > 0) {
-        const newHost = Array.from(gameState.room.players.values())[0];
+        const newHost: Player = Array.from(gameState.room.players.values())[0];
         newHost.isHost = true;
         gameState.room.hostId = newHost.id;
         console.log(`👑 New host assigned: ${newHost.name}`);

@@ -1,7 +1,8 @@
 // Stage Manager - Handles game stage transitions and logic
 
-import { GameState, Card, StormGameState, LaneSelectionState, CoinStageState, DealerSelectionState } from '@havoc-speedway/shared';
+import { GameState, Card, StormGameState, LaneSelectionState, CoinStageState, DealerSelectionState, Player } from '@havoc-speedway/shared';
 import { Lane, Coin, RacingState, PawnState, TrackPosition, CoinValue } from '@havoc-speedway/shared';
+import { PlayerAction } from '@havoc-speedway/shared';
 import { CardDeck } from '../CardDeck.js';
 
 export class StageManager {
@@ -17,7 +18,7 @@ export class StageManager {
     
     // Get all players in slot order (seat order)
     const players = Array.from(gameState.room.players.values())
-      .sort((a, b) => a.roomSlot - b.roomSlot);
+      .sort((a: Player, b: Player) => a.roomSlot - b.roomSlot);
     
     if (players.length === 0) {
       console.error('No players found for dealer selection');
@@ -38,7 +39,7 @@ export class StageManager {
     });
 
     // Create dealer selection state
-    (gameState as any).dealerSelection = {
+    const dealerSelectionState: DealerSelectionState = {
       dealerCards,
       selectedCards: {},
       currentSelectingPlayerId: players[0].id, // First player in seat order
@@ -46,6 +47,7 @@ export class StageManager {
       isComplete: false,
       tieBreakerPlayers: [] // Initialize tie-breaker array
     };
+    (gameState as any).dealerSelection = dealerSelectionState;
 
     console.log(`🎴 Dealt 18 cards for dealer selection. First player: ${players[0].name}`);
   }
@@ -104,7 +106,7 @@ export class StageManager {
     return false;
   }
 
-  handlePlayerAction(gameState: GameState, playerId: string, action: any): boolean {
+  handlePlayerAction(gameState: GameState, playerId: string, action: PlayerAction): boolean {
     console.log(`🎮 Player action: ${playerId} -> ${action.type} in ${gameState.stage}`);
     
     switch (gameState.stage) {
@@ -461,7 +463,7 @@ export class StageManager {
   }
 
   // Action handlers
-  private handleDealerSelectionAction(gameState: GameState, playerId: string, action: any): boolean {
+  private handleDealerSelectionAction(gameState: GameState, playerId: string, action: PlayerAction): boolean {
     console.log('🎴 Handling dealer selection action');
     
     const dealerSelection = (gameState as any).dealerSelection;
@@ -510,7 +512,7 @@ export class StageManager {
     return false;
   }
 
-  private handleStormAction(gameState: GameState, playerId: string, action: any): boolean {
+  private handleStormAction(gameState: GameState, playerId: string, action: PlayerAction): boolean {
     console.log(`⛈️ Handling storm action: ${action.type} from ${playerId}`);
     
     const storm = gameState.storm;
@@ -753,7 +755,7 @@ export class StageManager {
     console.log(`♻️ Reshuffled discard pile: ${storm.stockPile.length} cards back to stock`);
   }
 
-  private handleLaneSelectionAction(gameState: GameState, playerId: string, action: any): boolean {
+  private handleLaneSelectionAction(gameState: GameState, playerId: string, action: PlayerAction): boolean {
     console.log('🛣️ Handling lane selection action');
     
     const laneSelection = (gameState as any).laneSelection;

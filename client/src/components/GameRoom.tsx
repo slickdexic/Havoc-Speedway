@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { GameState, Player } from '../../../shared/src/types/game';
-import type { StormGameState } from '../../../shared/src/types/cards';
-import ProfessionalDealerSelection from './ProfessionalDealerSelection';
+import type { Player } from '../../../shared/src/types/game';
+import type { ClientGameState, ClientStormState } from '../../../shared/src/types/client';
+import DealerSelection from './DealerSelection';
 import '../styles/game-ui.css';
-import '../styles/professional-dealer-selection.css';
 
 interface GameRoomProps {
-  gameState: GameState;
+  gameState: ClientGameState;
   currentPlayer: Player;
   onGameAction: (action: any) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, isPrivate: boolean, targetPlayerId?: string) => void;
   onSendPrivateMessage: (targetPlayerId: string, message: string) => void;
   players: Player[];
   messages: Array<{
@@ -25,7 +24,7 @@ interface GameRoomProps {
 
 // Temporary Storms Stage Component
 const StormsStage: React.FC<{
-  stormState: StormGameState;
+  stormState: ClientStormState;
   currentPlayer: Player;
   onGameAction: (action: any) => void;
 }> = ({ stormState, currentPlayer, onGameAction }) => {
@@ -39,13 +38,13 @@ const StormsStage: React.FC<{
       <div className="storms-content">
         <div className="storms-info">
           <p>Current Player: {stormState.currentPlayerId}</p>
-          <p>Cards in Stock: {stormState.stockPile.length}</p>
+          <p>Cards in Discard: {stormState.discardPile.length}</p>
           <p>Toxic Seven Active: {stormState.toxicSevenActive ? 'Yes' : 'No'}</p>
         </div>
         
         <div className="player-status">
           <h3>Players:</h3>
-          {Array.from(stormState.playerHands.entries()).map(([playerId, hand]) => (
+          {Object.entries(stormState.playerHands).map(([playerId, hand]) => (
             <div key={playerId} className="player-item">
               <span>Player {playerId}</span>
               <span> - Cards: {hand.cardCount}</span>
@@ -113,7 +112,7 @@ const GameRoom: React.FC<GameRoomProps> = ({
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (chatMessage.trim()) {
-      onSendMessage(chatMessage.trim());
+      onSendMessage(chatMessage.trim(), false); // public message
       setChatMessage('');
     }
   };
@@ -132,9 +131,10 @@ const GameRoom: React.FC<GameRoomProps> = ({
     switch (gameState.stage) {
       case 'dealer-selection':
         return (
-          <ProfessionalDealerSelection
+          <DealerSelection
             dealerState={gameState.dealerSelection!}
             currentPlayer={currentPlayer}
+            players={players}
             onGameAction={onGameAction}
           />
         );
@@ -185,7 +185,7 @@ const GameRoom: React.FC<GameRoomProps> = ({
                 <div className="player-info">
                   <span className="player-name">{player.name}</span>
                   {player.id === currentPlayer.id && <span className="you-badge">(You)</span>}
-                  {gameState.room.hostId === player.id && <span className="host-badge">👑</span>}
+                  {player.isHost && <span className="host-badge">👑</span>}
                 </div>
                 <button
                   onClick={() => {
@@ -208,7 +208,7 @@ const GameRoom: React.FC<GameRoomProps> = ({
           <div className="game-details">
             <p><strong>Stage:</strong> {gameState.stage}</p>
             <p><strong>Round:</strong> {gameState.roundNumber}</p>
-            <p><strong>Room:</strong> {gameState.room.id}</p>
+            <p><strong>Room:</strong> {gameState.roomName}</p>
           </div>
         </div>
 

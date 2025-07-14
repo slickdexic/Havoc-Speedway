@@ -19,6 +19,7 @@ interface GameState {
   dealerCards?: any[];
   message?: string;
   roundNumber?: number;
+  stormWinningOrder?: string[];
 }
 
 interface RoomInfo {

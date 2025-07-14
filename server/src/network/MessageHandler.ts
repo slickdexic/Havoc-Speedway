@@ -2,8 +2,9 @@
 
 import { WebSocket } from 'ws';
 import { GameServer } from '../game/GameServer.js';
-import { Player, PlayerColor } from '@havoc-speedway/shared';
+import { Player, PlayerColor } from '../../../shared/src/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 interface ClientConnection {
   ws: WebSocket;
@@ -25,10 +26,13 @@ export class MessageHandler {
 
     ws.on('message', (data) => {
       try {
+        console.log('📥 Raw message received:', data.toString());
         const message = JSON.parse(data.toString());
+        console.log('✅ Parsed message:', JSON.stringify(message));
         this.handleMessage(ws, message);
       } catch (error) {
         console.error('❌ Invalid JSON message:', error);
+        console.error('❌ Raw data that failed to parse:', data.toString());
         this.sendError(ws, 'Invalid message format');
       }
     });
@@ -54,7 +58,14 @@ export class MessageHandler {
     const connection = this.connections.get(ws);
     if (!connection) return;
 
-    console.log('📨 Message received:', message.type);
+    // Validate message has required type property
+    if (!message || typeof message !== 'object' || !message.type) {
+      console.error('❌ Message missing type property:', JSON.stringify(message));
+      this.sendError(ws, 'Invalid message format - missing type');
+      return;
+    }
+
+    console.log('📨 Message received:', message.type, 'Data:', JSON.stringify(message));
 
     switch (message.type) {
       case 'create_room':
@@ -451,7 +462,7 @@ export class MessageHandler {
         if (gameState.dealerSelection) {
           (serialized as any).dealerSelection = {
             dealerCards: gameState.dealerSelection.dealerCards,
-            selectedCards: this.mapToObject(gameState.dealerSelection.selectedCards),
+            selectedCards: gameState.dealerSelection.selectedCards, // Already an object, don't call mapToObject
             currentSelectingPlayerId: gameState.dealerSelection.currentSelectingPlayerId,
             dealerId: gameState.dealerSelection.dealerId,
             isComplete: gameState.dealerSelection.isComplete
@@ -500,8 +511,8 @@ export class MessageHandler {
       case 'racing':
         if (gameState.racing) {
           (serialized as any).racing = {
-            pawns: this.mapToObject(gameState.racing.pawns),
-            coins: this.mapToObject(gameState.racing.coins),
+            pawns: gameState.racing.pawns, // Already an object (Record<string, PawnState>)
+            coins: gameState.racing.coins, // Already an object (Record<string, Coin>)
             currentRacingPlayer: gameState.racing.currentRacingPlayer,
             raceFinished: gameState.racing.raceFinished,
             finishingOrder: gameState.racing.finishingOrder,
@@ -520,6 +531,12 @@ export class MessageHandler {
    */
   private mapToObject(map: Map<any, any> | undefined): any {
     if (!map) return {};
+    
+    // Check if it's actually a Map
+    if (!(map instanceof Map)) {
+      console.warn('⚠️ mapToObject called with non-Map value:', typeof map, map);
+      return map || {};
+    }
     
     const obj: any = {};
     for (const [key, value] of map) {
@@ -709,6 +726,12 @@ export class MessageHandler {
       return;
     }
 
+    // Validate message content
+    if (!message.content || typeof message.content !== 'string' || message.content.trim().length === 0) {
+      this.sendError(ws, 'Message content is required');
+      return;
+    }
+
     const gameState = this.gameServer.getGameState(connection.roomId);
     if (!gameState) {
       this.sendError(ws, 'Room not found');
@@ -723,9 +746,9 @@ export class MessageHandler {
 
     const chatMessage = {
       type: 'message_received',
-      id: require('crypto').randomUUID(),
+      id: randomUUID(),
       sender: player.name,
-      content: message.content,
+      content: message.content.trim(),
       isPrivate: message.isPrivate || false,
       timestamp: Date.now()
     };
@@ -815,7 +838,7 @@ export class MessageHandler {
       // Send a system message about the name change
       const systemMessage = {
         type: 'message_received',
-        id: require('crypto').randomUUID(),
+        id: randomUUID(),
         sender: 'System',
         content: `${oldName} changed their name to ${trimmedName}`,
         isPrivate: false,

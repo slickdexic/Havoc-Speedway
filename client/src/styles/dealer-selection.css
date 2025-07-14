@@ -1,0 +1,522 @@
+/* Modern Dealer Selection - Clean, Professional Design */
+
+.dealer-selection {
+  padding: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  color: white;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Player Cards Row - Design Reference Compliant */
+.player-cards-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 40px;
+  flex-wrap: wrap;
+}
+
+.player-card {
+  width: 200px;
+  height: 140px;
+  background: linear-gradient(145deg, #334155, #475569);
+  border: 3px solid #64748b;
+  border-radius: 16px;
+  padding: 16px;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.player-card.active-turn {
+  border-color: #fbbf24;
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+  background: linear-gradient(145deg, #451a03, #78350f);
+  transform: translateY(-4px);
+}
+
+.player-card.completed {
+  border-color: #22c55e;
+  background: linear-gradient(145deg, #064e3b, #047857);
+}
+
+.player-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #f1f5f9;
+  margin-bottom: 8px;
+}
+
+.player-pawn {
+  font-size: 28px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Dealer Button Area - Per Design Reference */
+.dealer-button-area {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.selected-card-mini {
+  width: 50px;
+  height: 70px;
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid #e2e8f0;
+}
+
+.selected-card-mini .card-rank {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.selected-card-mini .card-suit {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Turn Indicator */
+.turn-indicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.selecting-text {
+  font-size: 0.9rem;
+  color: #fbbf24;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: #fbbf24;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { 
+    opacity: 0.4; 
+    transform: scale(0.8); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: scale(1.2); 
+  }
+}
+
+/* Turn Status */
+.turn-status {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.my-turn-text {
+  color: #fbbf24;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+.waiting-text {
+  color: #94a3b8;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+@keyframes text-glow {
+  0%, 100% { 
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.6); 
+  }
+  50% { 
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.9); 
+  }
+}
+
+/* Card Selection Area */
+.card-selection-area {
+  margin-bottom: 20px;
+}
+
+.cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.card-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Modern Card Design */
+.dealer-card {
+  width: 100px;
+  height: 150px;
+  border-radius: 12px;
+  cursor: default;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.dealer-card.face-down {
+  background: linear-gradient(145deg, #374151, #4b5563);
+  border: 2px solid #6b7280;
+}
+
+.dealer-card.revealed {
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border: 2px solid #e5e7eb;
+}
+
+.dealer-card.selectable {
+  cursor: pointer;
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.dealer-card.selectable:hover {
+  transform: translateY(-8px) scale(1.05);
+  border-color: #f59e0b;
+  box-shadow: 0 16px 32px rgba(245, 158, 11, 0.6);
+}
+
+.dealer-card.selectable:active {
+  transform: translateY(-4px) scale(1.03);
+}
+
+/* Card Faces */
+.card-face {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border-radius: 10px;
+}
+
+.card-back {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.card-pattern {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  opacity: 0.6;
+}
+
+.pattern-lines {
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #9ca3af, transparent);
+  border-radius: 2px;
+}
+
+.pattern-center {
+  font-size: 2.2rem;
+  color: #9ca3af;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hover-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.2) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.dealer-card.selectable:hover .hover-glow {
+  opacity: 1;
+}
+
+/* Card Content */
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.card-corner.top-left {
+  top: 8px;
+  left: 8px;
+}
+
+.card-corner.bottom-right {
+  bottom: 8px;
+  right: 8px;
+  transform: rotate(180deg);
+}
+
+.card-corner .rank {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.card-corner .suit {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.card-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.center-suit {
+  font-size: 3rem;
+  opacity: 0.8;
+}
+
+/* Suit Colors */
+.red-suit {
+  color: #dc2626;
+}
+
+.black-suit {
+  color: #1f2937;
+}
+
+/* Instructions - Minimal */
+.instructions {
+  text-align: center;
+  padding: 16px;
+  background: rgba(30, 41, 59, 0.4);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+}
+
+.instructions p {
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.instructions strong {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+/* Completion State */
+.dealer-complete {
+  text-align: center;
+  padding: 60px 40px;
+  background: linear-gradient(145deg, #064e3b, #065f46);
+  border-radius: 20px;
+  border: 3px solid #22c55e;
+  box-shadow: 0 0 40px rgba(34, 197, 94, 0.4);
+}
+
+.dealer-complete h2 {
+  font-size: 2.5rem;
+  color: #22c55e;
+  margin-bottom: 30px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.dealer-announcement {
+  margin-bottom: 20px;
+}
+
+.dealer-crown {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  animation: crown-glow 2s ease-in-out infinite;
+}
+
+@keyframes crown-glow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.6)); 
+  }
+  50% { 
+    filter: drop-shadow(0 0 24px rgba(251, 191, 36, 0.9)); 
+  }
+}
+
+.dealer-announcement h3 {
+  font-size: 1.8rem;
+  color: #f0fdf4;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.dealer-pawn {
+  font-size: 2.5rem;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.4));
+}
+
+.dealer-complete p {
+  font-size: 1.2rem;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* Loading State */
+.loading-state {
+  text-align: center;
+  padding: 80px 40px;
+}
+
+.loading-state h2 {
+  color: #fbbf24;
+  font-size: 2.2rem;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.loading-state p {
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1000px) {
+  .dealer-selection {
+    padding: 20px;
+  }
+  
+  .player-cards-row {
+    gap: 16px;
+  }
+  
+  .player-card {
+    width: 180px;
+    height: 120px;
+  }
+  
+  .card-row {
+    gap: 10px;
+  }
+  
+  .dealer-card {
+    width: 85px;
+    height: 127px;
+  }
+  
+  .center-suit {
+    font-size: 2.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .player-cards-row {
+    gap: 12px;
+  }
+  
+  .player-card {
+    width: 160px;
+    height: 110px;
+    padding: 12px;
+  }
+  
+  .player-name {
+    font-size: 1rem;
+  }
+  
+  .player-pawn {
+    font-size: 24px;
+  }
+  
+  .dealer-card {
+    width: 75px;
+    height: 112px;
+  }
+  
+  .card-row {
+    gap: 8px;
+  }
+  
+  .center-suit {
+    font-size: 2rem;
+  }
+  
+  .my-turn-text {
+    font-size: 1.2rem;
+  }
+  
+  .waiting-text {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dealer-selection {
+    padding: 16px;
+  }
+  
+  .player-card {
+    width: 140px;
+    height: 100px;
+    padding: 10px;
+  }
+  
+  .dealer-card {
+    width: 65px;
+    height: 97px;
+  }
+  
+  .card-row {
+    gap: 6px;
+  }
+  
+  .center-suit {
+    font-size: 1.5rem;
+  }
+  
+  .pattern-center {
+    font-size: 1.8rem;
+  }
+}
