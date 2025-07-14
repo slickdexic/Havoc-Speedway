@@ -5,7 +5,7 @@ import './styles/room.css'
 import './styles/game.css'
 import { LobbyNew } from './components/LobbyNew'
 import { Room } from './components/Room'
-import { GameRoom } from './components/GameRoom'
+import GameRoom from './components/GameRoom'
 import type { GameSettings, Player } from '@havoc-speedway/shared';
 
 interface GameState {

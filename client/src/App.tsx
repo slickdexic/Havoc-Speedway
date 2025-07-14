@@ -5,21 +5,8 @@ import './styles/room.css'
 import './styles/game.css'
 import { LobbyNew } from './components/LobbyNew'
 import { Room } from './components/Room'
-import { GameRoom } from './components/GameRoom'
-import type { GameSettings, Player } from '@havoc-speedway/shared';
-
-interface GameState {
-  stage: string;
-  roomId: string;
-  roomName: string;
-  players: Player[];
-  settings?: GameSettings;
-  currentPlayerIndex?: number;
-  dealerIndex?: number;
-  dealerCards?: any[];
-  message?: string;
-  roundNumber?: number;
-}
+import GameRoom from './components/GameRoom'
+import type { GameSettings, Player, ClientGameState } from '@havoc-speedway/shared';
 
 interface RoomInfo {
   id: string;
@@ -80,7 +67,7 @@ function App() {
   } | null>(null);
   
   // Game state
-  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [gameState, setGameState] = useState<ClientGameState | null>(null);
   
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -186,14 +173,14 @@ function App() {
       case 'game_started':
         console.log('Game started:', message);
         // Transition to game state
-        setGameState(message.gameState);
+        setGameState(message.gameState as ClientGameState);
         setAppState('game');
         break;
 
       case 'game_state_updated':
         console.log('Game state updated:', message);
         if (appState === 'game') {
-          setGameState(message.gameState);
+          setGameState(message.gameState as ClientGameState);
         }
         break;
 

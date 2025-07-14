@@ -1,0 +1,668 @@
+/* Professional Dealer Selection Styles */
+.professional-dealer-selection {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #0f1419 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Casino Atmosphere */
+.casino-atmosphere {
+  position: relative;
+  width: 95%;
+  max-width: 1400px;
+  height: 90%;
+  perspective: 1000px;
+}
+
+.velvet-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(139, 69, 19, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(25, 25, 112, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #2c1810 0%, #1a0f0a 50%, #2c1810 100%);
+  border-radius: 20px;
+  box-shadow: 
+    inset 0 0 100px rgba(139, 69, 19, 0.3),
+    0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.gold-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 4px solid #ffd700;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.3),
+    inset 0 0 20px rgba(255, 215, 0, 0.1);
+}
+
+/* Luxury Header */
+.stage-header-luxury {
+  text-align: center;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.crown-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  animation: crownGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes crownGlow {
+  from { text-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+  to { text-shadow: 0 0 30px rgba(255, 215, 0, 1), 0 0 40px rgba(255, 215, 0, 0.6); }
+}
+
+.luxury-title {
+  font-family: 'Georgia', serif;
+  font-size: 3.5rem;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(255, 215, 0, 0.5);
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.luxury-subtitle {
+  font-family: 'Georgia', serif;
+  font-size: 1.5rem;
+  color: #e6d7c3;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Loading State */
+.loading-casino {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.poker-chips {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.chip {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  position: relative;
+  animation: chipBounce 1.5s ease-in-out infinite;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.red-chip {
+  background: linear-gradient(145deg, #dc143c, #8b0000);
+  border: 3px solid #ffd700;
+  animation-delay: 0s;
+}
+
+.blue-chip {
+  background: linear-gradient(145deg, #4169e1, #000080);
+  border: 3px solid #ffd700;
+  animation-delay: 0.2s;
+}
+
+.green-chip {
+  background: linear-gradient(145deg, #228b22, #006400);
+  border: 3px solid #ffd700;
+  animation-delay: 0.4s;
+}
+
+@keyframes chipBounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-20px) rotate(90deg); }
+  50% { transform: translateY(-30px) rotate(180deg); }
+  75% { transform: translateY(-20px) rotate(270deg); }
+}
+
+.casino-text {
+  font-family: 'Georgia', serif;
+  font-size: 1.5rem;
+  color: #e6d7c3;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Turn Indicator */
+.casino-turn-indicator {
+  margin-bottom: 2rem;
+  text-align: center;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turn-spotlight {
+  position: relative;
+  padding: 2rem;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
+  border-radius: 20px;
+  animation: spotlightPulse 2s ease-in-out infinite alternate;
+}
+
+@keyframes spotlightPulse {
+  from { box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); }
+  to { box-shadow: 0 0 50px rgba(255, 215, 0, 0.6), 0 0 80px rgba(255, 215, 0, 0.3); }
+}
+
+.spotlight-effect {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: conic-gradient(from 0deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+  border-radius: 25px;
+  animation: spotlightRotate 4s linear infinite;
+}
+
+@keyframes spotlightRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.turn-content {
+  position: relative;
+  z-index: 1;
+}
+
+.your-turn-text {
+  font-family: 'Georgia', serif;
+  font-size: 2.5rem;
+  color: #ffd700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.instruction-text {
+  font-family: 'Georgia', serif;
+  font-size: 1.3rem;
+  color: #e6d7c3;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.waiting-elegance {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.hourglass-icon {
+  font-size: 2rem;
+  animation: hourglassFlip 2s ease-in-out infinite;
+}
+
+@keyframes hourglassFlip {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+}
+
+.waiting-text {
+  font-family: 'Georgia', serif;
+  font-size: 1.5rem;
+  color: #e6d7c3;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.player-highlight {
+  color: #ffd700;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+/* Card Table */
+.luxury-card-table {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.table-felt {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(ellipse at center, #0f4d0f 0%, #064406 70%, #032103 100%);
+  border-radius: 15px;
+  box-shadow: 
+    inset 0 0 50px rgba(0, 0, 0, 0.5),
+    0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.professional-card-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 3rem;
+  width: 100%;
+  max-width: 1000px;
+  height: 400px;
+}
+
+/* Luxury Cards */
+.luxury-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  transform-style: preserve-3d;
+}
+
+.luxury-card.selectable {
+  animation: cardGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes cardGlow {
+  from { 
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  }
+  to { 
+    box-shadow: 
+      0 0 30px rgba(255, 215, 0, 0.8),
+      0 0 50px rgba(255, 215, 0, 0.4);
+  }
+}
+
+.luxury-card.selectable:hover {
+  transform: translateY(-8px) rotateX(5deg);
+  box-shadow: 
+    0 15px 40px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(255, 215, 0, 0.6);
+}
+
+.luxury-card.revealed {
+  animation: cardFlip 0.8s ease-in-out;
+}
+
+@keyframes cardFlip {
+  0% { transform: rotateY(0deg) scale(1); }
+  50% { transform: rotateY(90deg) scale(1.1); }
+  100% { transform: rotateY(0deg) scale(1); }
+}
+
+.luxury-card.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Card Back Design */
+.card-back-luxury {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #8b0000, #4a0000);
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.3),
+    inset 0 0 20px rgba(255, 0, 0, 0.2);
+  border: 2px solid #ffd700;
+}
+
+.card-back-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.back-design {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ornate-border {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 2px solid #ffd700;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 215, 0, 0.1) 2px,
+    rgba(255, 215, 0, 0.1) 4px
+  );
+}
+
+.center-emblem {
+  font-size: 2.5rem;
+  color: #ffd700;
+  text-shadow: 
+    0 0 10px rgba(255, 215, 0, 0.8),
+    2px 2px 4px rgba(0, 0, 0, 0.5);
+  z-index: 1;
+}
+
+.corner-flourishes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.flourish {
+  position: absolute;
+  font-size: 1rem;
+  color: #ffd700;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}
+
+.flourish.top-left { top: 8px; left: 8px; }
+.flourish.top-right { top: 8px; right: 8px; }
+.flourish.bottom-left { bottom: 8px; left: 8px; }
+.flourish.bottom-right { bottom: 8px; right: 8px; }
+
+.selection-glow {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  border-radius: 16px;
+  animation: selectionPulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes selectionPulse {
+  from { opacity: 0.5; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.02); }
+}
+
+/* Revealed Card Design */
+.card-revealed {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #ffffff, #f8f8f8);
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.2),
+    inset 0 1px 3px rgba(255, 255, 255, 0.5);
+  border: 2px solid #ddd;
+}
+
+.card-border {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.card-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-rank-large {
+  font-family: 'Georgia', serif;
+  font-size: 2rem;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0.25rem;
+}
+
+.card-suit-large {
+  font-size: 2.5rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.red-suit {
+  color: #dc143c;
+}
+
+.black-suit {
+  color: #000000;
+}
+
+.card-corners {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Georgia', serif;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.corner.top-left {
+  top: 6px;
+  left: 6px;
+}
+
+.corner.bottom-right {
+  bottom: 6px;
+  right: 6px;
+}
+
+.mini-rank, .mini-suit {
+  line-height: 1;
+}
+
+.rotated {
+  transform: rotate(180deg);
+}
+
+/* Dealer Revealed State */
+.dealer-revealed {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.celebration-banner {
+  text-align: center;
+  padding: 3rem;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
+  border-radius: 20px;
+  border: 3px solid #ffd700;
+  box-shadow: 
+    0 0 40px rgba(255, 215, 0, 0.3),
+    inset 0 0 20px rgba(255, 215, 0, 0.1);
+}
+
+.dealer-announcement {
+  font-family: 'Georgia', serif;
+  font-size: 3rem;
+  color: #ffd700;
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(255, 215, 0, 0.5);
+  margin-bottom: 2rem;
+  animation: celebrationGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes celebrationGlow {
+  from { 
+    text-shadow: 
+      2px 2px 4px rgba(0, 0, 0, 0.8),
+      0 0 20px rgba(255, 215, 0, 0.5);
+  }
+  to { 
+    text-shadow: 
+      2px 2px 4px rgba(0, 0, 0, 0.8),
+      0 0 30px rgba(255, 215, 0, 0.8),
+      0 0 50px rgba(255, 215, 0, 0.3);
+  }
+}
+
+.winner-display {
+  margin: 2rem 0;
+}
+
+.dealer-crown {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: crownCelebration 2s ease-in-out infinite;
+}
+
+@keyframes crownCelebration {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(-5deg); }
+  75% { transform: scale(1.1) rotate(5deg); }
+}
+
+.dealer-name {
+  font-family: 'Georgia', serif;
+  font-size: 2.5rem;
+  color: #ffd700;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.dealer-description {
+  font-family: 'Georgia', serif;
+  font-size: 1.5rem;
+  color: #e6d7c3;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.transition-notice {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.loading-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.loading-dots span {
+  font-size: 2rem;
+  color: #ffd700;
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: 0s; }
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+.transition-notice p {
+  font-family: 'Georgia', serif;
+  font-size: 1.3rem;
+  color: #e6d7c3;
+  font-style: italic;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .professional-card-grid {
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 1rem;
+    padding: 2rem;
+  }
+  
+  .luxury-title {
+    font-size: 2.5rem;
+  }
+  
+  .your-turn-text {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .professional-card-grid {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+    gap: 0.75rem;
+    padding: 1.5rem;
+    height: 350px;
+  }
+  
+  .luxury-title {
+    font-size: 2rem;
+  }
+  
+  .card-rank-large {
+    font-size: 1.5rem;
+  }
+  
+  .card-suit-large {
+    font-size: 2rem;
+  }
+  
+  .center-emblem {
+    font-size: 2rem;
+  }
+}

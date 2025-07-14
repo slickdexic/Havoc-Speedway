@@ -1,0 +1,989 @@
+import { useState, useEffect } from 'react';
+import type { GameSettings, Player, PlayerColor } from '@havoc-speedway/shared';
+import { GameSounds, soundManager } from '../utils/SoundManager';
+import { GameAnimations } from '../utils/AnimationManager';
+import Track from './Track';
+import { DealerSelectionStage } from './DealerSelectionStage';
+import '../styles/dealer-selection-new.css';
+
+interface GameState {
+  roomName: string;
+  stage: string;
+  players: Player[];
+  settings?: GameSettings;
+  message?: string;
+}
+
+interface GameRoomProps {
+  gameState: GameState;
+  currentPlayerId: string;
+  isHost: boolean;
+  onLeaveRoom: () => void;
+  onStartGame: () => void;
+  onKickPlayer: (playerId: string) => void;
+  onChangeSettings: (settings: GameSettings) => void;
+  onSendMessage: (message: string, isPrivate: boolean, targetPlayerId?: string) => void;
+  onChangeColor: (color: string) => void;
+  onPlayerAction: (action: any) => void; // For game stage actions
+  chatMessages: Array<{
+    id: string;
+    sender: string;
+    content: string;
+    isPrivate: boolean;
+    timestamp: number;
+  }>;
+}
+
+export function GameRoom({ 
+  gameState, 
+  currentPlayerId, 
+  isHost, 
+  onLeaveRoom, 
+  onStartGame, 
+  onKickPlayer, 
+  onChangeSettings,
+  onSendMessage,
+  onChangeColor,
+  onPlayerAction,
+  chatMessages
+}: GameRoomProps) {
+  const [message, setMessage] = useState('');
+  const [privateMessage, setPrivateMessage] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
+
+  // Initialize sound system on mount
+  useEffect(() => {
+    soundManager.initialize();
+    GameSounds.playLobbyMusic();
+    
+    return () => {
+      GameSounds.stopMusic();
+    };
+  }, []);
+
+  // Play appropriate music based on game stage
+  useEffect(() => {
+    if (gameState.stage === 'waiting') {
+      GameSounds.playLobbyMusic();
+    } else if (gameState.stage === 'dealer_selection' || gameState.stage === 'storm') {
+      GameSounds.stopMusic();
+      GameSounds.playGameMusic();
+    } else if (gameState.stage === 'racing') {
+      GameSounds.stopMusic();
+      GameSounds.playRacingMusic();
+    }
+  }, [gameState.stage]);
+
+  // Add card flip animations
+  useEffect(() => {
+    if (gameState.stage === 'dealer_selection') {
+      const dealerSelection = (gameState as any).dealerSelection;
+      if (dealerSelection?.dealerCards) {
+        const flippedCards = dealerSelection.dealerCards.filter((card: any) => card.isFlipped);
+        flippedCards.forEach((card: any, index: number) => {
+          const cardElement = document.querySelector(`[data-card-id="${card.id}"]`);
+          if (cardElement) {
+            setTimeout(() => {
+              GameSounds.cardFlip();
+              GameAnimations.flipCard(cardElement);
+            }, index * 200);
+          }
+        });
+      }
+    }
+  }, [gameState]);
+
+  // Add entrance animations for new players
+  useEffect(() => {
+    const playerElements = document.querySelectorAll('.player-card:not(.animated)');
+    playerElements.forEach((element, index) => {
+      element.classList.add('animated');
+      setTimeout(() => {
+        GameAnimations.playerJoin(element);
+      }, index * 150);
+    });
+  }, [gameState.players.length]);
+
+  // Add entrance animations for new chat messages
+  useEffect(() => {
+    const newMessages = document.querySelectorAll('.message:not(.animated)');
+    newMessages.forEach((element) => {
+      element.classList.add('animated');
+      GameAnimations.messageReceived(element);
+      if (element.classList.contains('private')) {
+        GameSounds.notification();
+      }
+    });
+  }, [chatMessages]);
+
+  const isWaiting = gameState.stage === 'waiting' || gameState.stage === 'dealer-selection';
+  const canStart = isHost && gameState.players.length >= 2 && isWaiting;
+
+  const handleSendRoomChat = () => {
+    if (message.trim()) {
+      GameSounds.buttonClick();
+      onSendMessage(message.trim(), false);
+      setMessage('');
+    }
+  };
+
+  const handleSendPrivateMessage = () => {
+    if (privateMessage.trim() && selectedPlayer) {
+      GameSounds.buttonClick();
+      onSendMessage(privateMessage.trim(), true, selectedPlayer);
+      setPrivateMessage('');
+      setSelectedPlayer('');
+    }
+  };
+
+  const availableColors: PlayerColor[] = ['yellow', 'orange', 'red', 'pink', 'purple', 'blue', 'green', 'black'];
+  const usedColors = gameState.players.map(p => p.color);
+  const unusedColors = availableColors.filter(color => !usedColors.includes(color));
+
+  // If we're in an active game stage, use professional game layout
+  if (gameState.stage !== 'waiting') {
+    return (
+      <div className="app game-mode">
+        {/* Professional Game Header */}
+        <div className="game-header">
+          <div className="game-title-section">
+            <h1 className="game-title">🏁 Havoc Speedway</h1>
+            <div className="game-info">
+              <span className="room-name">{gameState.roomName}</span>
+              <div className="stage-indicator">
+                <span className="stage-name">{gameState.stage.replace(/([A-Z])/g, ' $1').replace('_', ' ')}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="game-controls">
+            <button 
+              onClick={() => {
+                GameSounds.buttonClick();
+                onLeaveRoom();
+              }} 
+              className="btn btn-danger"
+            >
+              🚪 Leave Game
+            </button>
+          </div>
+        </div>
+
+        {/* Professional Game Content */}
+        <div className="game-content">
+          {/* Player Cards Section - Always at top as per design reference */}
+          <PlayerCardsSection 
+            players={gameState.players}
+            currentPlayerId={currentPlayerId}
+            gameState={gameState}
+            onKickPlayer={onKickPlayer}
+            isHost={isHost}
+            setSelectedPlayer={setSelectedPlayer}
+          />
+
+          {/* Stage-Specific Content */}
+          {gameState.stage === 'dealer-selection' && (
+            <DealerSelectionStage 
+              gameState={gameState}
+              currentPlayerId={currentPlayerId}
+              onPlayerAction={onPlayerAction}
+            />
+          )}
+          
+          {gameState.stage === 'storm' && (
+            <StormStage 
+              gameState={gameState}
+              currentPlayerId={currentPlayerId}
+              onPlayerAction={onPlayerAction}
+            />
+          )}
+          
+          {gameState.stage === 'laneSelection' && (
+            <Track
+              stage="lane-selection"
+              gameState={gameState}
+              currentPlayerId={currentPlayerId}
+              onPlayerAction={onPlayerAction}
+            />
+          )}
+          
+          {gameState.stage === 'coin' && (
+            <Track
+              stage="coin"
+              gameState={gameState}
+              currentPlayerId={currentPlayerId}
+              onPlayerAction={onPlayerAction}
+            />
+          )}
+          
+          {gameState.stage === 'racing' && (
+            <Track
+              stage="racing"
+              gameState={gameState}
+              currentPlayerId={currentPlayerId}
+              onPlayerAction={onPlayerAction}
+            />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Pre-game room layout (waiting stage)
+  return (
+    <div className="app game-mode">
+      {/* Room Header */}
+      <div className="room-header">
+        <h1 className="room-title">🏁 {gameState.roomName}</h1>
+        <div className="room-status">
+          <span className="status-badge waiting">Waiting to Start</span>
+        </div>
+      </div>
+
+      {gameState.message && (
+        <div className="game-message">
+          {gameState.message}
+        </div>
+      )}
+
+      <div className="game-content">
+        {/* Always Visible Game Settings */}
+        {gameState.settings && (
+          <div className="settings-panel">
+            <h3 className="text-xl font-bold text-center mb-6">🎮 Game Settings</h3>
+            <div className="settings-grid">
+              <div className="setting-item">
+                <label>Race Laps:</label>
+                {isHost ? (
+                  <select 
+                    value={gameState.settings.numberOfLaps}
+                    onChange={(e) => onChangeSettings({
+                      ...gameState.settings!,
+                      numberOfLaps: Number(e.target.value) as 1|2|3|4|5
+                    })}
+                    className="input"
+                  >
+                    {[1,2,3,4,5].map(n => (
+                      <option key={n} value={n}>{n} Lap{n > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="setting-value">{gameState.settings.numberOfLaps} Lap{gameState.settings.numberOfLaps > 1 ? 's' : ''}</div>
+                )}
+              </div>
+              
+              <div className="setting-item">
+                <label>Movement Dice:</label>
+                {isHost ? (
+                  <select 
+                    value={gameState.settings.numberOfDice}
+                    onChange={(e) => onChangeSettings({
+                      ...gameState.settings!,
+                      numberOfDice: Number(e.target.value) as 1|2
+                    })}
+                    className="input"
+                  >
+                    <option value={1}>1 Die</option>
+                    <option value={2}>2 Dice</option>
+                  </select>
+                ) : (
+                  <div className="setting-value">{gameState.settings.numberOfDice} Die{gameState.settings.numberOfDice > 1 ? 'ce' : ''}</div>
+                )}
+              </div>
+              
+              <div className="setting-item">
+                <label>Card Decks:</label>
+                {isHost ? (
+                  <select 
+                    value={gameState.settings.numberOfDecks}
+                    onChange={(e) => onChangeSettings({
+                      ...gameState.settings!,
+                      numberOfDecks: Number(e.target.value) as 1|2
+                    })}
+                    className="input"
+                  >
+                    <option value={1}>1 Deck (32 cards)</option>
+                    <option value={2}>2 Decks (64 cards)</option>
+                  </select>
+                ) : (
+                  <div className="setting-value">{gameState.settings.numberOfDecks} Deck{gameState.settings.numberOfDecks > 1 ? 's' : ''}</div>
+                )}
+              </div>
+              
+              <div className="setting-item">
+                <label>Cards per Hand:</label>
+                {isHost ? (
+                  <select 
+                    value={gameState.settings.cardsPerHand}
+                    onChange={(e) => onChangeSettings({
+                      ...gameState.settings!,
+                      cardsPerHand: Number(e.target.value) as 3|4|5
+                    })}
+                    className="input"
+                  >
+                    {[3,4,5].map(n => (
+                      <option key={n} value={n}>{n} Cards</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="setting-value">{gameState.settings.cardsPerHand} Cards</div>
+                )}
+              </div>
+              
+              <div className="setting-item">
+                <label>Racing Coins:</label>
+                {isHost ? (
+                  <select 
+                    value={gameState.settings.numberOfCoins}
+                    onChange={(e) => onChangeSettings({
+                      ...gameState.settings!,
+                      numberOfCoins: Number(e.target.value) as 1|2|3
+                    })}
+                    className="input"
+                  >
+                    {[1,2,3].map(n => (
+                      <option key={n} value={n}>{n} Coin{n > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="setting-value">{gameState.settings.numberOfCoins} Coin{gameState.settings.numberOfCoins > 1 ? 's' : ''}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Players Section */}
+        <div className="players-section">
+          <div className="section-header">
+            <h3 className="text-lg font-semibold">👥 Players ({gameState.players.length}/4)</h3>
+          </div>
+          
+          <div className="players-grid">
+            {gameState.players.map((player) => (
+              <div 
+                key={player.id} 
+                className={`player-card ${player.id === currentPlayerId ? 'current-player' : ''} ${!player.isConnected ? 'disconnected' : ''}`}
+              >
+                <div className="player-header">
+                  <div className="player-avatar">
+                    <div className={`avatar-circle color-${player.color}`}>
+                      {player.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="connection-indicator">
+                      {player.isConnected ? '🟢' : '🔴'}
+                    </div>
+                  </div>
+                  
+                  <div className="player-info">
+                    <div className="player-name">
+                      <span className="name-text">{player.name}</span>
+                      <div className="player-badges">
+                        {player.isHost && <span className="badge badge-warning" title="Host">👑 Host</span>}
+                        {!player.isConnected && <span className="badge badge-danger" title="Disconnected">⚠️ Offline</span>}
+                        {player.id === currentPlayerId && <span className="badge badge-success">You</span>}
+                      </div>
+                    </div>
+                    
+                    <div className="player-details">
+                      <div className={`player-color-indicator color-${player.color}`}>
+                        <div className="color-dot"></div>
+                        <span className="color-name text-sm">{player.color}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="player-actions">
+                    {isHost && !player.isHost && (
+                      <button 
+                        onClick={() => onKickPlayer(player.id)}
+                        className="btn btn-sm btn-danger"
+                        title="Kick Player"
+                        aria-label={`Kick ${player.name}`}
+                      >
+                        ❌
+                      </button>
+                    )}
+                    
+                    {player.id !== currentPlayerId && (
+                      <button 
+                        onClick={() => setSelectedPlayer(player.id)}
+                        className="btn btn-sm btn-secondary"
+                        title="Send Private Message"
+                        aria-label={`Send private message to ${player.name}`}
+                      >
+                        💬
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {player.id === currentPlayerId && unusedColors.length > 0 && (
+                  <div className="color-changer">
+                    <label className="text-sm font-medium">Your Color:</label>
+                    <select 
+                      value={player.color}
+                      onChange={(e) => onChangeColor(e.target.value)}
+                      className="input"
+                      aria-label="Change your color"
+                    >
+                      <option value={player.color}>{player.color}</option>
+                      {unusedColors.map(color => (
+                        <option key={color} value={color}>{color}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {/* Empty slots */}
+            {Array.from({ length: 4 - gameState.players.length }, (_, i) => (
+              <div key={`empty-${i}`} className="player-card empty-slot">
+                <div className="empty-slot-content">
+                  <div className="empty-avatar">👤</div>
+                  <div className="waiting-text text-sm text-secondary">Waiting for player...</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Game Controls */}
+        {canStart && (
+          <div className="game-controls text-center p-6">
+            <button 
+              onClick={() => {
+                GameSounds.buttonClick();
+                onStartGame();
+              }} 
+              className="btn btn-xl btn-primary hover-scale"
+            >
+              🎮 Start Game
+            </button>
+          </div>
+        )}
+
+        {/* Chat Section */}
+        <div className="chat-section">
+          <div className="chat-header">
+            <h4 className="font-semibold">💬 Room Chat</h4>
+            <div className="badge badge-primary">{chatMessages.length}</div>
+          </div>
+          
+          <div className="chat-messages">
+            {chatMessages.length === 0 ? (
+              <div className="no-messages">
+                <div className="text-secondary text-center p-4">💭 No messages yet... Start the conversation!</div>
+              </div>
+            ) : (
+              chatMessages.map((msg) => (
+                <div 
+                  key={msg.id} 
+                  className={`message ${msg.isPrivate ? 'private' : 'public'}`}
+                >
+                  <div className="message-header">
+                    <span className="message-sender font-medium">{msg.sender}</span>
+                    <span className="message-time text-xs text-secondary">{new Date(msg.timestamp || Date.now()).toLocaleTimeString()}</span>
+                    {msg.isPrivate && <span className="private-indicator">🔒</span>}
+                  </div>
+                  <div className="message-content">{msg.content}</div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <div className="chat-input">
+            <div className="room-chat">
+              <div className="input-group">
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendRoomChat()}
+                  placeholder="Type a message to all players..."
+                  className="input"
+                  maxLength={500}
+                />
+                <button 
+                  onClick={handleSendRoomChat} 
+                  className="btn btn-primary"
+                  disabled={!message.trim()}
+                  aria-label="Send message to all players"
+                >
+                  📤 Send
+                </button>
+              </div>
+            </div>
+            
+            {selectedPlayer && (
+              <div className="private-chat">
+                <div className="private-chat-header">
+                  <div className="private-chat-title font-medium">
+                    🔒 Private message to <strong>{gameState.players.find(p => p.id === selectedPlayer)?.name}</strong>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedPlayer('')} 
+                    className="btn btn-sm btn-secondary"
+                    aria-label="Close private chat"
+                  >
+                    ❌
+                  </button>
+                </div>
+                <div className="private-chat-input">
+                  <div className="input-group">
+                    <input
+                      type="text"
+                      value={privateMessage}
+                      onChange={(e) => setPrivateMessage(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendPrivateMessage()}
+                      placeholder="Type a private message..."
+                      className="input"
+                      maxLength={500}
+                    />
+                    <button 
+                      onClick={handleSendPrivateMessage} 
+                      className="btn btn-warning"
+                      disabled={!privateMessage.trim()}
+                      aria-label="Send private message"
+                    >
+                      🔐 Send Private
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Leave Room Controls */}
+        <div className="room-controls text-center p-4">
+          <button 
+            onClick={() => {
+              GameSounds.buttonClick();
+              onLeaveRoom();
+            }} 
+            className="btn btn-secondary"
+          >
+            🚪 Leave Room
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/*
+// Professional Dealer Selection Stage Component
+interface DealerSelectionStageProps {
+  gameState: GameState;
+  currentPlayerId: string;
+  onPlayerAction: (action: any) => void;
+}
+
+  return (
+    <div className="dealer-selection-stage">
+      {/* Stage Header */}
+      <div className="stage-header">
+        <div className="stage-title">🃏 Dealer Selection</div>
+        <div className="stage-subtitle">Each player selects a card to determine the dealer</div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="dealer-selection-content">
+        {isComplete ? (
+          <div className="dealer-determined">
+            <h3>� Dealer Determined!</h3>
+            <p>
+              <strong>{gameState.players.find(p => p.id === dealerSelection.dealerId)?.name}</strong> drew the lowest card and is now the dealer!
+            </p>
+            <div className="continue-prompt">
+              <p className="text-lg">Proceeding to the Storm stage...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Turn Indicator */}
+            <div className={`turn-indicator ${isCurrentPlayersTurn ? 'your-turn' : 'waiting-turn'}`}>
+              {isCurrentPlayersTurn ? (
+                <div>
+                  <div className="turn-text">🎯 Your Turn!</div>
+                  <div className="turn-subtitle">Select any face-down card from the deck below</div>
+                </div>
+              ) : (
+                <div className="waiting-text">
+                  ⏳ Waiting for <strong>{currentTurnPlayer?.name}</strong> to select a card...
+                </div>
+              )}
+            </div>
+            
+            {/* Card Grid - 3 rows of 6 cards (18 total) */}
+            <div className="card-grid">
+              {dealerSelection.dealerCards?.map((card: any, index: number) => (
+                <div
+                  key={card.id || index}
+                  data-card-id={card.id}
+                  className={`dealer-card ${card.isFlipped ? 'flipped' : ''} ${isCurrentPlayersTurn && !card.isFlipped ? 'selectable' : ''}`}
+                  onClick={() => isCurrentPlayersTurn && !card.isFlipped && handleCardClick(card.id)}
+                  tabIndex={isCurrentPlayersTurn && !card.isFlipped ? 0 : -1}
+                  onKeyPress={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isCurrentPlayersTurn && !card.isFlipped) {
+                      e.preventDefault();
+                      handleCardClick(card.id);
+                    }
+                  }}
+                  aria-label={card.isFlipped ? `${card.rank} of ${card.suit}` : `Face-down card ${index + 1}`}
+                >
+                  {card.isFlipped ? (
+                    <div className="card-face">
+                      <div className={`card-rank ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {card.rank}
+                      </div>
+                      <div className={`card-suit ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'red' : 'black'}`}>
+                        {card.suit === 'hearts' ? '♥' : 
+                         card.suit === 'diamonds' ? '♦' : 
+                         card.suit === 'clubs' ? '♣' : '♠'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="card-back">🂠</div>
+                  )}
+                </div>
+              )) || Array.from({ length: 18 }, (_, i) => (
+                <div key={i} className="dealer-card skeleton">
+                  <div className="card-back">🂠</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+*/
+
+// Professional Storm Stage Component
+interface StormStageProps {
+  gameState: GameState;
+  currentPlayerId: string;
+  onPlayerAction: (action: any) => void;
+}
+
+function StormStage({ gameState, currentPlayerId, onPlayerAction }: StormStageProps) {
+  const storm = (gameState as any).storm;
+  
+  if (!storm) {
+    return (
+      <div className="storm-stage">
+        <div className="stage-header">
+          <div className="stage-title">🌪️ Storm Stage</div>
+          <div className="stage-subtitle">Preparing the storm...</div>
+        </div>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">Loading storm stage...</div>
+        </div>
+      </div>
+    );
+  }
+
+  const handlePlayCard = (cardId: string, calledSuit?: string) => {
+    GameSounds.cardSelect();
+    onPlayerAction({
+      type: 'PLAY_CARD',
+      playerId: currentPlayerId,
+      cardId,
+      calledSuit
+    });
+  };
+
+  const handleDrawCards = () => {
+    GameSounds.cardDeal();
+    onPlayerAction({
+      type: 'DRAW_CARDS',
+      playerId: currentPlayerId,
+      count: storm.toxicDrawAmount || 1
+    });
+  };
+
+  const isCurrentPlayersTurn = storm.currentPlayerId === currentPlayerId;
+  const playerHand = storm.playerHands?.get(currentPlayerId);
+  const topCard = storm.discardPile?.[storm.discardPile.length - 1];
+  const currentTurnPlayer = gameState.players.find(p => p.id === storm.currentPlayerId);
+
+  return (
+    <div className="storm-stage">
+      {/* Stage Header */}
+      <div className="stage-header">
+        <div className="stage-title">🌪️ Storm Stage</div>
+        <div className="stage-subtitle">Navigate through the storm with strategy and skill</div>
+      </div>
+      
+      <div className="storm-content">
+        {/* Turn Indicator */}
+        <div className={`turn-indicator ${isCurrentPlayersTurn ? 'your-turn' : 'waiting-turn'}`}>
+          {isCurrentPlayersTurn ? (
+            <div>
+              <div className="turn-text">⚡ Your Turn!</div>
+              {storm.toxicSevenActive && (
+                <div className="toxic-warning">
+                  <div className="toxic-title">☠️ Toxic 7 Active!</div>
+                  <div className="toxic-subtitle">Play a 7 or draw {storm.toxicDrawAmount} cards</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="waiting-text">
+              ⏳ Waiting for <strong>{currentTurnPlayer?.name}</strong> to play...
+            </div>
+          )}
+        </div>
+
+        <div className="storm-board">
+          {/* Discard Pile Section */}
+          <div className="discard-section">
+            <h4 className="section-title">🎯 Current Card</h4>
+            {topCard ? (
+              <div className="top-card-container">
+                <div className={`top-card ${topCard.suit === 'hearts' || topCard.suit === 'diamonds' ? 'red-card' : 'black-card'}`}>
+                  <div className="card-rank">{topCard.rank}</div>
+                  <div className="card-suit">
+                    {topCard.suit === 'hearts' ? '♥' : 
+                     topCard.suit === 'diamonds' ? '♦' : 
+                     topCard.suit === 'clubs' ? '♣' : '♠'}
+                  </div>
+                </div>
+                {storm.calledSuit && (
+                  <div className="called-suit">
+                    Called: <strong>{storm.calledSuit}</strong>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="no-card">
+                <div className="text-secondary">No cards played yet</div>
+              </div>
+            )}
+          </div>
+
+          {/* Draw Pile Info */}
+          <div className="draw-pile-section">
+            <h4 className="section-title">📚 Draw Pile</h4>
+            <div className={`draw-pile-info ${storm.toxicSevenActive ? 'toxic' : ''}`}>
+              <div className="pile-count">{storm.deckCount || 0} cards</div>
+              {storm.toxicSevenActive && (
+                <div className="toxic-indicator">
+                  <div className="toxic-title">☠️ TOXIC</div>
+                  <div className="draw-amount">Draw {storm.toxicDrawAmount}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Player Hand */}
+        {playerHand && (
+          <div className="player-hand-section">
+            <h4 className="section-title">
+              🃏 Your Hand ({playerHand.cardCount} card{playerHand.cardCount !== 1 ? 's' : ''})
+            </h4>
+            <div className="hand-cards">
+              {playerHand.cards.map((card: any, index: number) => (
+                <div
+                  key={card.id}
+                  className={`hand-card ${isCurrentPlayersTurn ? 'clickable' : ''} ${card.suit === 'hearts' || card.suit === 'diamonds' ? 'red-card' : 'black-card'}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                  onClick={() => isCurrentPlayersTurn && handlePlayCard(card.id)}
+                  tabIndex={isCurrentPlayersTurn ? 0 : -1}
+                  onKeyPress={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && isCurrentPlayersTurn) {
+                      e.preventDefault();
+                      handlePlayCard(card.id);
+                    }
+                  }}
+                  aria-label={`Play ${card.rank} of ${card.suit}`}
+                >
+                  <div className="card-rank">{card.rank}</div>
+                  <div className="card-suit">
+                    {card.suit === 'hearts' ? '♥' : 
+                     card.suit === 'diamonds' ? '♦' : 
+                     card.suit === 'clubs' ? '♣' : '♠'}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {isCurrentPlayersTurn && (
+              <div className="storm-actions">
+                <button 
+                  onClick={handleDrawCards}
+                  className="btn btn-secondary draw-button"
+                  aria-label={`Draw ${storm.toxicDrawAmount || 1} card${storm.toxicDrawAmount > 1 ? 's' : ''}`}
+                >
+                  📥 Draw {storm.toxicDrawAmount || 1} Card{storm.toxicDrawAmount > 1 ? 's' : ''}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Storm Stats */}
+        <div className="storm-stats">
+          <div className="stat-item">
+            <div className="stat-label">Deck</div>
+            <div className="stat-value">{storm.deckCount || 0}</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">Players</div>
+            <div className="stat-value">{gameState.players.length}</div>
+          </div>
+          {storm.toxicSevenActive && (
+            <div className="stat-item toxic-stat">
+              <div className="stat-label">☠️ Draw</div>
+              <div className="stat-value">{storm.toxicDrawAmount}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Professional Player Cards Section Component
+interface PlayerCardsSectionProps {
+  players: Player[];
+  currentPlayerId: string;
+  gameState: GameState;
+  onKickPlayer: (playerId: string) => void;
+  isHost: boolean;
+  setSelectedPlayer: (playerId: string) => void;
+}
+
+function PlayerCardsSection({ 
+  players, 
+  currentPlayerId, 
+  gameState, 
+  onKickPlayer, 
+  isHost, 
+  setSelectedPlayer 
+}: PlayerCardsSectionProps) {
+  return (
+    <div className="player-cards-container">
+      <div className="player-cards">
+        {players.map((player) => {
+          const isCurrentPlayer = player.id === currentPlayerId;
+          const dealerSelection = (gameState as any).dealerSelection;
+          const storm = (gameState as any).storm;
+          const playerSelectedCard = dealerSelection?.selectedCards?.[player.id];
+          const isDealer = dealerSelection?.dealerId === player.id || storm?.dealerId === player.id;
+          
+          return (
+            <div 
+              key={player.id} 
+              className={`player-card ${isCurrentPlayer ? 'current-player' : ''} ${isDealer ? 'dealer' : ''}`}
+            >
+              {/* Player Name - centered above middle */}
+              <div className="player-name">{player.name}</div>
+              
+              {/* Player Pawn - centered below name */}
+              <div className={`player-pawn color-${player.color}`}>
+                ♟
+              </div>
+              
+              {/* Dealer Button */}
+              {isDealer && (
+                <div className="dealer-button">
+                  <span className="dealer-text">DEALER</span>
+                </div>
+              )}
+              
+              {/* Storm Stage: Badges and Hand Cards */}
+              {storm && (
+                <div className="storm-elements">
+                  {/* Finishing order badges */}
+                  {storm.finishingOrder && storm.finishingOrder.length > 0 && (
+                    <div className="finishing-badges">
+                      {storm.finishingOrder.map((finishedPlayerId: string, orderIndex: number) => {
+                        if (finishedPlayerId === player.id) {
+                          const position = orderIndex + 1;
+                          return (
+                            <div key={position} className={`finishing-badge position-${position}`}>
+                              {position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : `${position}th`}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Cards in hand visualization */}
+                  {storm.playerHands?.get && storm.playerHands.get(player.id) && (
+                    <div className="hand-visualization">
+                      <div className="fanned-cards">
+                        {Array.from({ length: Math.min(storm.playerHands.get(player.id).cardCount, 8) }, (_, i) => (
+                          <div key={i} className="card-back-mini" style={{ transform: `rotate(${-20 + (i * 5)}deg) translateX(${i * -3}px)` }}>
+                            🂠
+                          </div>
+                        ))}
+                      </div>
+                      <div className="card-count">{storm.playerHands.get(player.id).cardCount}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Dealer Selection: Selected Card Display */}
+              {playerSelectedCard && gameState.stage === 'dealer-selection' && (
+                <div className="dealer-button-area">
+                  <div className="selected-card">
+                    <div className={`card-rank ${playerSelectedCard.suit === 'hearts' || playerSelectedCard.suit === 'diamonds' ? 'red' : 'black'}`}>
+                      {playerSelectedCard.rank}
+                    </div>
+                    <div className={`card-suit ${playerSelectedCard.suit === 'hearts' || playerSelectedCard.suit === 'diamonds' ? 'red' : 'black'}`}>
+                      {playerSelectedCard.suit === 'hearts' ? '♥' : 
+                       playerSelectedCard.suit === 'diamonds' ? '♦' : 
+                       playerSelectedCard.suit === 'clubs' ? '♣' : '♠'}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Racing Stage: Lap Number */}
+              {(gameState.stage === 'racing' || gameState.stage === 'coin' || gameState.stage === 'laneSelection') && (
+                <div className="lap-indicator">
+                  Lap 1
+                </div>
+              )}
+              
+              {/* Player Actions (only visible to others) */}
+              {!isCurrentPlayer && (
+                <div className="player-actions">
+                  {isHost && !player.isHost && (
+                    <button 
+                      onClick={() => onKickPlayer(player.id)}
+                      className="btn btn-sm btn-danger"
+                      title="Kick Player"
+                    >
+                      ❌
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setSelectedPlayer(player.id)}
+                    className="btn btn-sm btn-secondary"
+                    title="Send Private Message"
+                  >
+                    💬
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default GameRoom;
